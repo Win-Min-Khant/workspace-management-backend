@@ -4,6 +4,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { AppError } from "../utils/appError.js";
 import jwt, { type JwtPayload } from "jsonwebtoken";
 import { User } from "../models/user.model.js";
+import { Workspace } from "../models/workspace.model.js";
 
 interface AuthUser {
   userId: string | Types.ObjectId;
@@ -69,9 +70,19 @@ export const protect = asyncHandler(
 // @desc Middleware to check if user is owner
 export const isOwner = asyncHandler(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
-    if (req.user?.role !== "owner") {
-      throw new AppError(403, "You have no permissions to make this action.");
+    const workspaceId = req.params.id;
+    const userId = req.user?.userId;
+
+    const workspace = await Workspace.findById(workspaceId);
+
+    console.log("Workspace found:", workspace ? "Yes" : "No");
+    console.log("Workspace Owner ID:", workspace?.ownerId.toString());
+    console.log("Logged in User ID:", userId);
+
+    if (!workspace || workspace.ownerId.toString() !== userId?.toString()) {
+      throw new AppError(403, "You are not the owner of this workspace.");
     }
+
     next();
   },
 );

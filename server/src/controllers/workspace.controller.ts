@@ -36,3 +36,17 @@ export const updateWorkspace = asyncHandler(
     });
   },
 );
+
+// @route GET | api/workspace/delete
+// @desc Delete Workspace
+// @access Private (Owner)
+export const deleteWorkspace = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    const workspaceId = req.params.id;
+    const userId = req.user?.userId;
+    await Workspace.deleteWorkspace(workspaceId as string, userId as string);
+    res
+      .status(200)
+      .json({ success: true, message: "Workspace deleted successfully." });
+  },
+);

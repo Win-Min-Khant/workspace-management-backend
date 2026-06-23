@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { Project } from "../models/project.model.js";
 import { Task } from "../models/task.model.js";
 import { User } from "../models/user.model.js";
@@ -53,5 +54,32 @@ export class Workspace {
     );
     if (!updatedWorkspace) throw new AppError(404, "Workspace not found.");
     return updatedWorkspace;
+  }
+
+  // Delete Workspace
+  static async deleteWorkspace(workspaceId: string, userId: string) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      const workspace =
+        await WorkspaceModel.findById(workspaceId).session(session);
+      if (!workspace) throw new AppError(404, "Workspace not found.");
+      if (workspace.ownerId.toString() !== userId.toString()) {
+        throw new AppError(403, "Only the owner can delete the workspace.");
+      }
+      await User.deleteMany({ workspaceId }, { session });
+      await Project.deleteMany({ workspaceId }, { session });
+      await Task.deleteMany({ workspaceId }, { session });
+
+      await WorkspaceModel.findByIdAndDelete(workspaceId).session(session);
+
+      await session.commitTransaction();
+      session.endSession();
+      return { message: "Workspace deleted successfully." };
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+      throw error;
+    }
   }
 }

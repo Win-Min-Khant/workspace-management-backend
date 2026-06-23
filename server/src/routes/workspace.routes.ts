@@ -5,6 +5,7 @@ import {
   protect,
 } from "../middlewares/protect.middleware.js";
 import {
+  deleteWorkspace,
   getWorkspaceDetails,
   updateWorkspace,
 } from "../controllers/workspace.controller.js";
@@ -22,4 +23,5 @@ router.post(
   isOwner,
   updateWorkspace,
 );
+router.delete("/delete/:id", protect, isOwner, deleteWorkspace);
 export default router;
