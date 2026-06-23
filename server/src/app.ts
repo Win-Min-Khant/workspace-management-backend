@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import { connectDB } from "./config/db.js";
 import authRoutes from "./routes/auth.routes.js";
 import errorHandler from "./middlewares/errorHandler.middleware.js";
+import workspaceRoutes from "./routes/workspace.routes.js";
 
 // dotenv config
 dotenv.config({
@@ -26,7 +27,9 @@ app.use(cookieParser());
 
 // routes
 app.use("/api/auth", authRoutes);
+app.use("/api/workspace", workspaceRoutes);
 
+// debug route list
 // custom middlewares
 app.use(errorHandler);
 
