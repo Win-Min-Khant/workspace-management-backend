@@ -1,13 +1,8 @@
 import mongoose, { Document, Schema, Types } from "mongoose";
-import type { UserRole } from "../types/auth.types.js";
+import type { Image, UserRole } from "../types/auth.types.js";
 import bcrypt from "bcryptjs";
 import jwt, { type Secret, type SignOptions } from "jsonwebtoken";
 import type { StringValue } from "ms";
-
-export interface Image {
-  image_url: string;
-  public_alt: string;
-}
 
 export interface IUser extends Document {
   name: string;

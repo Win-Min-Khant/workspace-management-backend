@@ -1,9 +1,10 @@
 import type { Document, Types } from "mongoose";
 import mongoose, { Schema } from "mongoose";
+import type { Image } from "../types/auth.types.js";
 
 export interface IWorkspace extends Document {
   name: string;
-  logo?: string;
+  logo?: Image;
   ownerId: Types.ObjectId;
 }
 
@@ -15,7 +16,10 @@ const workspaceSchema = new mongoose.Schema<IWorkspace>(
       trim: true,
     },
     logo: {
-      type: String,
+      type: {
+        image_url: String,
+        public_alt: String,
+      },
     },
     ownerId: {
       type: Schema.Types.ObjectId,

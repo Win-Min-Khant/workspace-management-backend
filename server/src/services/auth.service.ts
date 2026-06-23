@@ -1,5 +1,5 @@
 import type { Types } from "mongoose";
-import { User, type Image } from "../models/user.model.js";
+import { User } from "../models/user.model.js";
 import { Workspace } from "../models/workspace.model.js";
 import { AppError } from "../utils/appError.js";
 import jwt from "jsonwebtoken";

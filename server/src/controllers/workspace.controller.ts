@@ -16,3 +16,23 @@ export const getWorkspaceDetails = asyncHandler(
     });
   },
 );
+
+// @route GET | api/workspace/settings
+// @desc Workspace Settings
+// @access Private (Owner)
+export const updateWorkspace = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    const { name, logo } = req.body;
+    const workspaceId = req.user?.workspaceId;
+    const result = await Workspace.updateWorkspace(
+      workspaceId as string,
+      name,
+      logo,
+    );
+    res.status(200).json({
+      success: true,
+      message: "Workspace updated successfully.",
+      data: result,
+    });
+  },
+);
