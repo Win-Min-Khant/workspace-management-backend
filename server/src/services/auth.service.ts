@@ -13,7 +13,7 @@ export interface LoginDto {
 export interface RegisterDto extends LoginDto {
   workspaceName: string;
   name: string;
-  image_url?: string;
+  image_url: string;
 }
 
 export class AuthService {
@@ -38,18 +38,6 @@ export class AuthService {
       role: "owner",
       workspaceId: workspace._id,
     });
-
-    if (data?.image_url) {
-      const response = await uploadSingleImage(
-        data?.image_url,
-        "jira-clone/avatar",
-      );
-      user.avatar = {
-        image_url: response.image_url,
-        public_alt: response.public_alt,
-      };
-      await user.save();
-    }
 
     workspace.ownerId = user._id;
 

@@ -5,7 +5,7 @@ import { AppError } from "../utils/appError.js";
 import jwt, { type JwtPayload } from "jsonwebtoken";
 import { User } from "../models/user.model.js";
 
-interface User {
+interface AuthUser {
   userId: string | Types.ObjectId;
   name: string;
   email: string;
@@ -14,7 +14,7 @@ interface User {
 }
 
 export interface AuthRequest extends Request {
-  user?: User;
+  user?: AuthUser;
 }
 
 // @desc Middleware to check if user is logged in or not
@@ -81,6 +81,19 @@ export const isAdmin = asyncHandler(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     if (req.user?.role !== "admin") {
       throw new AppError(403, "You have no permissions to make this action.");
+    }
+    next();
+  },
+);
+
+// @desc Middleware to check if user is admin and owner
+export const isOwnerOrAdmin = asyncHandler(
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (req.user?.role !== "owner" && req.user?.role !== "admin") {
+      throw new AppError(
+        403,
+        "Access denied. Owner or Admin permissions required.",
+      );
     }
     next();
   },

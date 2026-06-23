@@ -6,6 +6,7 @@ import {
   logout,
   register,
   updateName,
+  uploadAvatar,
 } from "../controllers/auth.controller.js";
 import {
   loginValidation,
@@ -22,4 +23,5 @@ router.post("/logout", protect, logout);
 router.post("/refresh", refreshTokenValidation, validate, generateTokens);
 router.get("/profile", protect, getProfile);
 router.put("/profile/update-name", protect, updateName);
+router.put("/profile/upload-avatar", protect, uploadAvatar);
 export default router;
