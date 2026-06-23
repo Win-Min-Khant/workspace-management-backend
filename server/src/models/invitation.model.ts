@@ -8,6 +8,8 @@ export interface IInvitation extends Document {
   workspaceId: Types.ObjectId;
   status: "pending" | "accepted";
   token: string;
+  invitedBy: Types.ObjectId;
+  expiresAt: Date;
 }
 
 const invitationSchema = new mongoose.Schema<IInvitation>(
@@ -25,6 +27,7 @@ const invitationSchema = new mongoose.Schema<IInvitation>(
       type: Schema.Types.ObjectId,
       ref: "Workspace",
       required: true,
+      index: true,
     },
     status: {
       type: String,
@@ -34,6 +37,16 @@ const invitationSchema = new mongoose.Schema<IInvitation>(
     token: {
       type: String,
       required: true,
+    },
+    invitedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    expiresAt: {
+      type: Date,
+      required: true,
+      default: () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     },
   },
   {

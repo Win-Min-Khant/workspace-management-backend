@@ -10,7 +10,6 @@ export interface Image {
 }
 
 export interface IUser extends Document {
-  _id: Types.ObjectId;
   name: string;
   email: string;
   password: string;
@@ -62,12 +61,15 @@ const userSchema = new mongoose.Schema<IUser>(
       type: Schema.Types.ObjectId,
       ref: "Workspace",
       required: true,
+      index: true,
     },
   },
   {
     timestamps: true,
   },
 );
+
+userSchema.index({ email: 1, workspaceId: 1 }, { unique: true });
 
 // handling password hashing before saving into database
 userSchema.pre("save", async function () {
