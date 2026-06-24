@@ -30,7 +30,10 @@ export class InvitationService {
           role,
           inviteTokenExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         });
-        invitations.push(invite);
+        const newInvite = await Invitation.findById(invite._id).select(
+          "-inviteToken -inviteTokenExpiresAt",
+        );
+        invitations.push(newInvite);
       } catch (error) {
         console.log(`Error at sending invite email: ${error}`);
         throw error;
