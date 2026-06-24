@@ -1,15 +1,14 @@
-// Invitation Model (Epic 3 အတွက်)
-
 import mongoose, { Document, Schema, Types } from "mongoose";
+import crypto from "crypto";
 
 export interface IInvitation extends Document {
   email: string;
   role: "admin" | "member";
   workspaceId: Types.ObjectId;
   status: "pending" | "accepted";
-  token: string;
+  inviteToken: string;
   invitedBy: Types.ObjectId;
-  expiresAt: Date;
+  inviteTokenExpiresAt: Date;
 }
 
 const invitationSchema = new mongoose.Schema<IInvitation>(
@@ -34,7 +33,7 @@ const invitationSchema = new mongoose.Schema<IInvitation>(
       enum: ["pending", "accepted"],
       default: "pending",
     },
-    token: {
+    inviteToken: {
       type: String,
       required: true,
     },
@@ -43,7 +42,7 @@ const invitationSchema = new mongoose.Schema<IInvitation>(
       ref: "User",
       required: true,
     },
-    expiresAt: {
+    inviteTokenExpiresAt: {
       type: Date,
       required: true,
       default: () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),

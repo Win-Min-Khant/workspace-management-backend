@@ -6,6 +6,7 @@ export interface IWorkspace extends Document {
   name: string;
   logo?: Image;
   ownerId: Types.ObjectId;
+  token: string;
 }
 
 const workspaceSchema = new mongoose.Schema<IWorkspace>(
@@ -25,6 +26,7 @@ const workspaceSchema = new mongoose.Schema<IWorkspace>(
       type: Schema.Types.ObjectId,
       ref: "User",
     },
+    token: { type: String, required: true },
   },
   {
     timestamps: true,

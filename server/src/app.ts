@@ -6,6 +6,7 @@ import { connectDB } from "./config/db.js";
 import authRoutes from "./routes/auth.routes.js";
 import errorHandler from "./middlewares/errorHandler.middleware.js";
 import workspaceRoutes from "./routes/workspace.routes.js";
+import inviteRoutes from "./routes/invitation.routes.js";
 
 // dotenv config
 dotenv.config({
@@ -28,6 +29,7 @@ app.use(cookieParser());
 // routes
 app.use("/api/auth", authRoutes);
 app.use("/api/workspace", workspaceRoutes);
+app.use("/api/invitation", inviteRoutes);
 
 // debug route list
 // custom middlewares

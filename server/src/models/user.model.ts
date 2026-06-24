@@ -3,17 +3,19 @@ import type { Image, UserRole } from "../types/auth.types.js";
 import bcrypt from "bcryptjs";
 import jwt, { type Secret, type SignOptions } from "jsonwebtoken";
 import type { StringValue } from "ms";
+import crypto from "crypto";
 
 export interface IUser extends Document {
   name: string;
   email: string;
   password: string;
   role: UserRole;
-  workspaceId: Types.ObjectId;
+  workspaceIds: Types.ObjectId[];
   refreshToken: string;
   avatar?: Image;
+  lastAccessedWorkspaceId?: Types.ObjectId;
   isPasswordMatch(password: string): Promise<boolean>;
-  generateAccessToken(): string;
+  generateAccessToken(activeWorkspaceId?: string): string;
   generateRefreshToken(): string;
 }
 
@@ -52,19 +54,23 @@ const userSchema = new mongoose.Schema<IUser>(
     refreshToken: {
       type: String,
     },
-    workspaceId: {
-      type: Schema.Types.ObjectId,
+    lastAccessedWorkspaceId: {
+      type: mongoose.Schema.Types.ObjectId,
       ref: "Workspace",
-      required: true,
-      index: true,
     },
+    workspaceIds: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Workspace",
+        required: true,
+        index: true,
+      },
+    ],
   },
   {
     timestamps: true,
   },
 );
-
-userSchema.index({ email: 1, workspaceId: 1 }, { unique: true });
 
 // handling password hashing before saving into database
 userSchema.pre("save", async function () {
@@ -79,7 +85,7 @@ userSchema.methods.isPasswordMatch = async function (enterPassword: string) {
 };
 
 // Generate access token
-userSchema.methods.generateAccessToken = function () {
+userSchema.methods.generateAccessToken = function (activeWorkspaceId?: string) {
   const secretKey = process.env.JWT_ACCESS_TOKEN_SECRET_KEY as Secret;
   const accessExpiresIn =
     (process.env.JWT_ACCESS_TOKEN_EXPIRES_IN as StringValue) ||
@@ -91,8 +97,9 @@ userSchema.methods.generateAccessToken = function () {
   return jwt.sign(
     {
       userId: this._id,
-      workspaceId: this.workspaceId,
+      workspaceIds: this.workspaceIds,
       role: this.role,
+      activeWorkspaceId: activeWorkspaceId || this.workspaceIds[0],
     },
     secretKey,
     options,

@@ -11,7 +11,8 @@ interface AuthUser {
   name: string;
   email: string;
   role: string;
-  workspaceId: string | Types.ObjectId;
+  activeWorkspaceId?: string | Types.ObjectId;
+  workspaceIds: Types.ObjectId[];
 }
 
 export interface AuthRequest extends Request {
@@ -57,7 +58,11 @@ export const protect = asyncHandler(
         name: user.name,
         email: user.email,
         role: user.role,
-        workspaceId: user.workspaceId,
+        workspaceIds: user.workspaceIds,
+        activeWorkspaceId:
+          decoded.activeWorkspaceId ||
+          user.lastAccessedWorkspaceId ||
+          user.workspaceIds[0],
       };
 
       next();
@@ -70,14 +75,14 @@ export const protect = asyncHandler(
 // @desc Middleware to check if user is owner
 export const isOwner = asyncHandler(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
-    const workspaceId = req.params.id;
+    const workspaceId = req.user?.workspaceIds;
     const userId = req.user?.userId;
 
     const workspace = await Workspace.findById(workspaceId);
 
-    console.log("Workspace found:", workspace ? "Yes" : "No");
-    console.log("Workspace Owner ID:", workspace?.ownerId.toString());
-    console.log("Logged in User ID:", userId);
+    // console.log("Workspace found:", workspace ? "Yes" : "No");
+    // console.log("Workspace Owner ID:", workspace?.ownerId.toString());
+    // console.log("Logged in User ID:", userId);
 
     if (!workspace || workspace.ownerId.toString() !== userId?.toString()) {
       throw new AppError(403, "You are not the owner of this workspace.");
@@ -106,6 +111,24 @@ export const isOwnerOrAdmin = asyncHandler(
         "Access denied. Owner or Admin permissions required.",
       );
     }
+    next();
+  },
+);
+
+// @desc Middleware to check if user is member
+export const isMember = asyncHandler(
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    const workspaceId = req.params.workspaceId || req.body.workspaceId;
+    const userWorkspaceIds = req.user?.workspaceIds || [];
+
+    const isMember = userWorkspaceIds.some(
+      (id) => id.toString() === workspaceId,
+    );
+
+    if (!isMember) {
+      throw new AppError(403, "You do not have access to this workspace.");
+    }
+
     next();
   },
 );

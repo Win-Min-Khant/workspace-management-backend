@@ -8,6 +8,63 @@ import { AppError } from "../utils/appError.js";
 import { deleteImage, uploadSingleImage } from "../utils/uploadToCloudinary.js";
 
 export class Workspace {
+  // Create New Workspace
+  static async createWorkspace(
+    name: string,
+    logoPath: string,
+    ownerId: string,
+  ) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      let uploadedLogo;
+      if (logoPath) {
+        uploadedLogo = (await uploadSingleImage(
+          logoPath,
+          "jira-clone/logo",
+        )) as Image;
+      }
+      const workspace = await WorkspaceModel.create(
+        [
+          {
+            name,
+            logo: {
+              image_url: uploadedLogo?.image_url || "",
+              public_alt: uploadedLogo?.public_alt || "",
+            },
+            ownerId,
+          },
+        ],
+        {
+          session,
+        },
+      );
+      const newWorkspace = workspace[0];
+      if (!newWorkspace || workspace.length === 0)
+        throw new AppError(500, "Workspace creation failed.");
+      const user = await User.findByIdAndUpdate(
+        ownerId,
+        {
+          $push: {
+            workspaceIds: newWorkspace._id,
+          },
+        },
+        { session },
+      );
+      await session.commitTransaction();
+      const accessToken = user!.generateAccessToken();
+
+      return {
+        workspace: workspace[0],
+        accessToken,
+      };
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
   // View Workspace Details
   static async getWorkspaceDetails(workspaceId: string) {
     const [workspace, totalMembers, totalProjects, totalTasks] =
@@ -67,19 +124,38 @@ export class Workspace {
       if (workspace.ownerId.toString() !== userId.toString()) {
         throw new AppError(403, "Only the owner can delete the workspace.");
       }
-      await User.deleteMany({ workspaceId }, { session });
+
+      await User.updateMany(
+        { workspaceIds: workspaceId },
+        { $pull: { workspaceIds: workspaceId } },
+        { session },
+      );
+
       await Project.deleteMany({ workspaceId }, { session });
       await Task.deleteMany({ workspaceId }, { session });
-
-      await WorkspaceModel.findByIdAndDelete(workspaceId).session(session);
+      await WorkspaceModel.findByIdAndDelete(workspaceId, { session });
 
       await session.commitTransaction();
-      session.endSession();
       return { message: "Workspace deleted successfully." };
     } catch (error) {
       await session.abortTransaction();
-      session.endSession();
       throw error;
+    } finally {
+      session.endSession();
     }
+  }
+
+  // Switch Workspace
+  static async switchWorkspace(userId: string, newWorkspaceId: string) {
+    const user = await User.findById(userId);
+    if (!user) throw new AppError(404, "User not found.");
+    if (!user.workspaceIds.includes(newWorkspaceId as any)) {
+      throw new AppError(403, "You do not have access to this workspace.");
+    }
+    user.lastAccessedWorkspaceId = newWorkspaceId as any;
+    await user.save({ validateBeforeSave: false });
+
+    const accessToken = user.generateAccessToken(newWorkspaceId as string);
+    return { accessToken };
   }
 }

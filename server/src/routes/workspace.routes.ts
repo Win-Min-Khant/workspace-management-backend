@@ -5,8 +5,10 @@ import {
   protect,
 } from "../middlewares/protect.middleware.js";
 import {
+  createWorkspace,
   deleteWorkspace,
   getWorkspaceDetails,
+  switchWorkspace,
   updateWorkspace,
 } from "../controllers/workspace.controller.js";
 import { validateWorkspaceUpdate } from "../validations/workspace.validation.js";
@@ -14,6 +16,8 @@ import { validate } from "../middlewares/validation.middleware.js";
 
 const router = Router();
 
+router.post("/create", protect, createWorkspace);
+router.post("/switch/:id", protect, switchWorkspace);
 router.get("/details", protect, isOwnerOrAdmin, getWorkspaceDetails);
 router.post(
   "/settings",

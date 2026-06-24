@@ -4,6 +4,7 @@ import { Workspace } from "../models/workspace.model.js";
 import { AppError } from "../utils/appError.js";
 import jwt from "jsonwebtoken";
 import { deleteImage, uploadSingleImage } from "../utils/uploadToCloudinary.js";
+import mongoose from "mongoose";
 
 export interface LoginDto {
   email: string;
@@ -19,7 +20,7 @@ export interface RegisterDto extends LoginDto {
 export class AuthService {
   // register
   static async register(data: RegisterDto) {
-    const { name, email, password, workspaceName, image_url } = data;
+    const { name, email, password, workspaceName } = data;
 
     const existingUser = await User.findOne({ email });
 
@@ -27,28 +28,47 @@ export class AuthService {
       throw new AppError(400, "Email already exists.");
     }
 
-    const workspace = await Workspace.create({
-      name: workspaceName,
-    });
+    // session starts
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    const user = await User.create({
-      name,
-      email,
-      password,
-      role: "owner",
-      workspaceId: workspace._id,
-    });
+    try {
+      const workspace = await Workspace.create([{ name: workspaceName }], {
+        session,
+      });
+      const newWorkspace = workspace?.[0];
+      if (!newWorkspace) throw new AppError(500, "Workspace creation failed.");
+      const user = await User.create(
+        [
+          {
+            name,
+            email,
+            password,
+            role: "owner",
+            workspaceIds: [newWorkspace._id],
+          },
+        ],
+        { session },
+      );
+      const newUser = user?.[0];
+      if (!newUser) throw new AppError(500, "User creation failed.");
 
-    workspace.ownerId = user._id;
+      await Workspace.findByIdAndUpdate(
+        newWorkspace._id,
+        { ownerId: newUser._id },
+        { session },
+      );
 
-    await workspace.save();
+      await session.commitTransaction();
 
-    const secureUser = await User.findById(user._id).select("-password");
-
-    return {
-      user: secureUser,
-      workspace,
-    };
+      const secureUser = await User.findById(newUser._id).select("-password");
+      return { user: secureUser, workspace: newWorkspace };
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
   }
 
   // login
@@ -87,7 +107,7 @@ export class AuthService {
         name: user.name,
         email: user.email,
         role: user.role,
-        workspaceId: user.workspaceId,
+        workspaceIds: user.workspaceIds,
       },
     };
   }
@@ -107,12 +127,8 @@ export class AuthService {
 
     const user = await User.findById(decoded.userId);
 
-    if (!user) {
-      throw new AppError(401, "User not found.");
-    }
-
-    if (user.refreshToken !== refreshToken) {
-      throw new AppError(401, "Invalid refresh token.");
+    if (!user || user.refreshToken !== refreshToken) {
+      throw new AppError(401, "Invalid session.");
     }
 
     const newAccessToken = user.generateAccessToken();
@@ -144,7 +160,7 @@ export class AuthService {
     const user = await User.findById(userId)
       .select("-password -refreshToken")
       .populate({
-        path: "workspaceId",
+        path: "workspaceIds",
         select: "name logo",
       });
 
