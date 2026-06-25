@@ -5,14 +5,13 @@ import { AppError } from "../utils/appError.js";
 import jwt, { type JwtPayload } from "jsonwebtoken";
 import { User } from "../models/user.model.js";
 import { Workspace } from "../models/workspace.model.js";
+import { UserWorkspace } from "../models/user_workspace.model.js";
+import mongoose from "mongoose";
 
 interface AuthUser {
   userId: string | Types.ObjectId;
   name: string;
   email: string;
-  role: string;
-  activeWorkspaceId?: string | Types.ObjectId;
-  workspaceIds: Types.ObjectId[];
 }
 
 export interface AuthRequest extends Request {
@@ -57,12 +56,6 @@ export const protect = asyncHandler(
         userId: decoded.userId,
         name: user.name,
         email: user.email,
-        role: user.role,
-        workspaceIds: user.workspaceIds,
-        activeWorkspaceId:
-          decoded.activeWorkspaceId ||
-          user.lastAccessedWorkspaceId ||
-          user.workspaceIds[0],
       };
 
       next();
@@ -75,16 +68,16 @@ export const protect = asyncHandler(
 // @desc Middleware to check if user is owner
 export const isOwner = asyncHandler(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
-    const workspaceId = req.user?.workspaceIds;
+    const workspaceId = req.params.workspaceId || req.body.workspaceId;
     const userId = req.user?.userId;
 
-    const workspace = await Workspace.findById(workspaceId);
+    const membership = await UserWorkspace.findOne({
+      userId: new mongoose.Types.ObjectId(userId as string),
+      workspaceId: new mongoose.Types.ObjectId(workspaceId as string),
+      role: "owner",
+    });
 
-    // console.log("Workspace found:", workspace ? "Yes" : "No");
-    // console.log("Workspace Owner ID:", workspace?.ownerId.toString());
-    // console.log("Logged in User ID:", userId);
-
-    if (!workspace || workspace.ownerId.toString() !== userId?.toString()) {
+    if (!membership) {
       throw new AppError(403, "You are not the owner of this workspace.");
     }
 
@@ -95,8 +88,17 @@ export const isOwner = asyncHandler(
 // @desc Middleware to check if user is admin
 export const isAdmin = asyncHandler(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
-    if (req.user?.role !== "admin") {
-      throw new AppError(403, "You have no permissions to make this action.");
+    const workspaceId = req.params.workspaceId || req.body.workspaceId;
+    const userId = req.user?.userId;
+
+    const membership = await UserWorkspace.findOne({
+      userId: new mongoose.Types.ObjectId(userId as string),
+      workspaceId: new mongoose.Types.ObjectId(workspaceId as string),
+      role: "admin",
+    });
+
+    if (!membership) {
+      throw new AppError(403, "You are not the owner of this workspace.");
     }
     next();
   },
@@ -105,23 +107,26 @@ export const isAdmin = asyncHandler(
 // @desc Middleware to check if user is admin and owner
 export const isOwnerOrAdmin = asyncHandler(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
-    const { workspaceId } = req.params;
-    const { role: roleToAssign } = req.body;
+    const workspaceId = req.params.workspaceId || req.body.workspaceId;
     const userId = req.user?.userId;
-    const workspace = await Workspace.findById(workspaceId);
-    if (!workspace) throw new AppError(404, "Workspace not found.");
-    const isOwner = workspace.ownerId.toString() === userId;
-    const isAdmin = workspace.members.find(
-      (m) => m.userId === userId && m.role === "admin",
-    );
-    if (!isOwner && !isAdmin) {
-      throw new AppError(403, "You do not have permission to invite users.");
-    }
-    if (isAdmin && !isOwner && roleToAssign === "admin") {
+
+    const membership = await UserWorkspace.findOne({
+      userId: new mongoose.Types.ObjectId(userId as string),
+      workspaceId: new mongoose.Types.ObjectId(workspaceId as string),
+    });
+
+    if (
+      !membership ||
+      (membership.role !== "owner" && membership.role !== "admin")
+    ) {
       throw new AppError(
         403,
-        "Admins cannot invite other Admins. Only Owners can.",
+        "You do not have permission to perform this action.",
       );
+    }
+
+    if (req.body.role === "admin" && membership.role !== "owner") {
+      throw new AppError(403, "Only owners can assign admin roles.");
     }
     next();
   },
@@ -131,15 +136,18 @@ export const isOwnerOrAdmin = asyncHandler(
 export const isMember = asyncHandler(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     const workspaceId = req.params.workspaceId || req.body.workspaceId;
-    const userWorkspaceIds = req.user?.workspaceIds || [];
+    const userId = req.user?.userId;
 
-    const isMember = userWorkspaceIds.some(
-      (id) => id.toString() === workspaceId,
-    );
+    const membership = await UserWorkspace.findOne({
+      userId: new mongoose.Types.ObjectId(userId as string),
+      workspaceId: new mongoose.Types.ObjectId(workspaceId as string),
+    });
 
-    if (!isMember) {
+    if (!membership) {
       throw new AppError(403, "You do not have access to this workspace.");
     }
+
+    (req as any).membership = membership;
 
     next();
   },

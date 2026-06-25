@@ -5,6 +5,7 @@ import { AppError } from "../utils/appError.js";
 import jwt from "jsonwebtoken";
 import { deleteImage, uploadSingleImage } from "../utils/uploadToCloudinary.js";
 import mongoose from "mongoose";
+import { UserWorkspace } from "../models/user_workspace.model.js";
 
 export interface LoginDto {
   email: string;
@@ -44,12 +45,12 @@ export class AuthService {
             name,
             email,
             password,
-            role: "owner",
-            workspaceIds: [newWorkspace._id],
+            // workspaceIds: [newWorkspace._id],
           },
         ],
         { session },
       );
+
       const newUser = user?.[0];
       if (!newUser) throw new AppError(500, "User creation failed.");
 
@@ -58,6 +59,12 @@ export class AuthService {
         { ownerId: newUser._id },
         { session },
       );
+
+      await UserWorkspace.create({
+        userId: newUser._id,
+        workspaceId: newWorkspace._id,
+        role: "owner",
+      });
 
       await session.commitTransaction();
 
@@ -106,8 +113,8 @@ export class AuthService {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role,
-        workspaceIds: user.workspaceIds,
+        // role: user.role,
+        // workspaceIds: user.workspaceIds,
       },
     };
   }

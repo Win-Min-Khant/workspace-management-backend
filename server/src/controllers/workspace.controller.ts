@@ -2,6 +2,7 @@ import type { Response } from "express";
 import type { AuthRequest } from "../middlewares/protect.middleware.js";
 import { Workspace } from "../services/workspace.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { UserWorkspace } from "../models/user_workspace.model.js";
 
 // @route POST | api/workspace/post
 // @desc Create Workspace
@@ -84,3 +85,7 @@ export const switchWorkspace = asyncHandler(
     res.status(200).json({ success: true, accessToken: result.accessToken });
   },
 );
+
+// @route GET | api/workspace/:id
+// @desc GET Workspace Info
+// @access Private (Owner/Admin)

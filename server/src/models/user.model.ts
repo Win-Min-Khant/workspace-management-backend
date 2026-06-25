@@ -9,8 +9,8 @@ export interface IUser extends Document {
   name: string;
   email: string;
   password: string;
-  role: UserRole;
-  workspaceIds: Types.ObjectId[];
+  // role: UserRole;
+  // workspaceIds: Types.ObjectId[];
   refreshToken: string;
   avatar?: Image;
   lastAccessedWorkspaceId?: Types.ObjectId;
@@ -45,12 +45,6 @@ const userSchema = new mongoose.Schema<IUser>(
         public_alt: String,
       },
     },
-
-    role: {
-      type: String,
-      enum: ["owner", "admin", "member"],
-      default: "member",
-    },
     refreshToken: {
       type: String,
     },
@@ -58,14 +52,6 @@ const userSchema = new mongoose.Schema<IUser>(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Workspace",
     },
-    workspaceIds: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: "Workspace",
-        required: true,
-        index: true,
-      },
-    ],
   },
   {
     timestamps: true,
@@ -97,9 +83,6 @@ userSchema.methods.generateAccessToken = function (activeWorkspaceId?: string) {
   return jwt.sign(
     {
       userId: this._id,
-      workspaceIds: this.workspaceIds,
-      role: this.role,
-      activeWorkspaceId: activeWorkspaceId || this.workspaceIds[0],
     },
     secretKey,
     options,

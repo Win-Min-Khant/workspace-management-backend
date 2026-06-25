@@ -51,6 +51,7 @@ export class InvitationService {
       inviteTokenExpiresAt: {
         $gt: new Date(),
       },
+      status: "pending",
     });
     if (!invitation)
       throw new AppError(400, "Invitation link is invalid or expired.");
@@ -60,31 +61,24 @@ export class InvitationService {
   // accept invitation
   static async acceptInvitation(token: string, userId: string) {
     const invitation = await InvitationService.verifyInviteToken(token);
-    const workspace = await Workspace.findById(invitation.workspaceId);
-    if (!workspace) throw new AppError(404, "Workspace not found.");
-    if (!workspace.members.some((m) => m.userId.toString() === userId)) {
-      await Workspace.updateOne(
-        { _id: workspace._id },
-        {
-          $push: {
-            members: {
-              userId: new mongoose.Types.ObjectId(userId),
-              role: invitation.role,
-            },
-          },
-        },
-      );
+    const workspaceExists = await Workspace.exists({
+      _id: invitation.workspaceId,
+    });
+    if (!workspaceExists) throw new AppError(404, "Workspace not found.");
+    const alreadyMember = await UserWorkspace.findOne({
+      userId: new mongoose.Types.ObjectId(userId),
+      workspaceId: invitation.workspaceId,
+    });
+    if (alreadyMember) {
+      throw new AppError(400, "User is already a member of this workspace.");
     }
-    await User.findByIdAndUpdate(
-      userId,
-      { $addToSet: { workspaceIds: invitation.workspaceId } },
-      { returnDocument: "after" },
-    );
+
     await UserWorkspace.create({
-      userId,
+      userId: new mongoose.Types.ObjectId(userId),
       workspaceId: invitation.workspaceId,
       role: invitation.role,
     });
+
     // await Invitation.findByIdAndDelete(invitation._id);
     await Invitation.findByIdAndUpdate(invitation._id, {
       status: "accepted",

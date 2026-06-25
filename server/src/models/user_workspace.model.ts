@@ -4,7 +4,7 @@ import mongoose, { Schema } from "mongoose";
 export interface IUWorkspace extends Document {
   userId: Types.ObjectId;
   workspaceId: Types.ObjectId;
-  role: "admin" | "member";
+  role: "admin" | "member" | "owner";
 }
 
 const userWorkspaceSchema = new mongoose.Schema<IUWorkspace>(
@@ -19,8 +19,8 @@ const userWorkspaceSchema = new mongoose.Schema<IUWorkspace>(
     },
     role: {
       type: String,
-      enum: ["admin", "member"],
-      default: "member",
+      enum: ["admin", "member", "owner"],
+      default: "owner",
     },
   },
   {
