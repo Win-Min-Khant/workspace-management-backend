@@ -1,7 +1,15 @@
 import { Router } from "express";
-import { isOwner, protect } from "../middlewares/protect.middleware.js";
-import { sendInvitation } from "../controllers/invitation.controller.js";
+import {
+  isOwner,
+  isOwnerOrAdmin,
+  protect,
+} from "../middlewares/protect.middleware.js";
+import {
+  acceptInvitation,
+  sendInvitation,
+} from "../controllers/invitation.controller.js";
 
 const router = Router();
-router.post("/send", protect, isOwner, sendInvitation);
+router.post("/:workspaceId/send", protect, isOwnerOrAdmin, sendInvitation);
+router.post("/accept/:token", protect, acceptInvitation);
 export default router;

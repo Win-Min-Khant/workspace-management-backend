@@ -3,12 +3,16 @@ import type { AuthRequest } from "../middlewares/protect.middleware.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { InvitationService } from "../services/invitation.service.js";
 
+// @route POST | api/api/invitation/:workspaceId/send
+// @desc Send invitation to admin and member with role access
+// @access Private (Owner or Admin)
 export const sendInvitation = asyncHandler(
   async (req: AuthRequest, res: Response) => {
-    const { emails, workspaceId, role } = req.body;
+    const { email, role } = req.body;
     const invitedBy = req.user?.userId;
+    const workspaceId = req.params.workspaceId;
     const result = await InvitationService.sendInvitation(
-      emails,
+      email,
       workspaceId as string,
       invitedBy as string,
       role,
@@ -17,5 +21,27 @@ export const sendInvitation = asyncHandler(
       success: true,
       data: result,
     });
+  },
+);
+
+// @route POST | api/invitation/accept/:token
+// @desc Accept invitation
+// @access Private (Owner or Admin)
+export const acceptInvitation = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    const token = req.params.token;
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "You need an account to join this workspace.",
+        action: "Please register to accept this invitation.",
+      });
+    }
+    const result = await InvitationService.acceptInvitation(
+      token as string,
+      userId as string,
+    );
+    res.status(200).json({ success: true, data: result });
   },
 );

@@ -105,10 +105,22 @@ export const isAdmin = asyncHandler(
 // @desc Middleware to check if user is admin and owner
 export const isOwnerOrAdmin = asyncHandler(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
-    if (req.user?.role !== "owner" && req.user?.role !== "admin") {
+    const { workspaceId } = req.params;
+    const { role: roleToAssign } = req.body;
+    const userId = req.user?.userId;
+    const workspace = await Workspace.findById(workspaceId);
+    if (!workspace) throw new AppError(404, "Workspace not found.");
+    const isOwner = workspace.ownerId.toString() === userId;
+    const isAdmin = workspace.members.find(
+      (m) => m.userId === userId && m.role === "admin",
+    );
+    if (!isOwner && !isAdmin) {
+      throw new AppError(403, "You do not have permission to invite users.");
+    }
+    if (isAdmin && !isOwner && roleToAssign === "admin") {
       throw new AppError(
         403,
-        "Access denied. Owner or Admin permissions required.",
+        "Admins cannot invite other Admins. Only Owners can.",
       );
     }
     next();
