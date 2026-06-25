@@ -74,18 +74,52 @@ export const deleteWorkspace = asyncHandler(
 // @route POST | api/workspace/switch
 // @desc POST Workspace
 // @access Private (Owner)
-export const switchWorkspace = asyncHandler(
+// export const switchWorkspace = asyncHandler(
+//   async (req: AuthRequest, res: Response) => {
+//     const workspaceId = req.params.id;
+//     const userId = req.user?.userId;
+//     const result = await Workspace.switchWorkspace(
+//       userId as string,
+//       workspaceId as string,
+//     );
+//     res.status(200).json({ success: true, accessToken: result.accessToken });
+//   },
+// );
+
+// @route GET | api/workspace/:id/members
+// @desc GET Owner/Admin/Member can view members in their workspace.
+// @access Private (Owner/Admin/Member)
+export const getWorkspaceMembers = asyncHandler(
   async (req: AuthRequest, res: Response) => {
-    const workspaceId = req.params.id;
-    const userId = req.user?.userId;
-    const result = await Workspace.switchWorkspace(
-      userId as string,
-      workspaceId as string,
-    );
-    res.status(200).json({ success: true, accessToken: result.accessToken });
+    const { workspaceId } = req.params;
+    const result = await Workspace.getWorkspaceMembers(workspaceId as string);
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
   },
 );
 
-// @route GET | api/workspace/:id
-// @desc GET Workspace Info
-// @access Private (Owner/Admin)
+// @route PATCH | api/workspace/:workspaceId/members/:memberId/role
+// @desc PATCH Assign role to admin and members
+// @access Private (Owner)
+export const updateMemberRole = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    const { workspaceId, memberId } = req.params;
+    const { role: newRole } = req.body;
+    const currentUserId = req.user?.userId;
+
+    const result = await Workspace.updateMemberRole(
+      workspaceId as string,
+      memberId as string,
+      currentUserId as string,
+      newRole,
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `Member role updated to ${newRole} successfully.`,
+      data: result,
+    });
+  },
+);

@@ -6,6 +6,7 @@ import { Workspace as WorkspaceModel } from "../models/workspace.model.js";
 import type { Image } from "../types/auth.types.js";
 import { AppError } from "../utils/appError.js";
 import { deleteImage, uploadSingleImage } from "../utils/uploadToCloudinary.js";
+import { UserWorkspace } from "../models/user_workspace.model.js";
 
 export class Workspace {
   // Create New Workspace
@@ -146,16 +147,58 @@ export class Workspace {
   }
 
   // Switch Workspace
-  static async switchWorkspace(userId: string, newWorkspaceId: string) {
-    const user = await User.findById(userId);
-    if (!user) throw new AppError(404, "User not found.");
-    if (!user.workspaceIds.includes(newWorkspaceId as any)) {
-      throw new AppError(403, "You do not have access to this workspace.");
-    }
-    user.lastAccessedWorkspaceId = newWorkspaceId as any;
-    await user.save({ validateBeforeSave: false });
+  // static async switchWorkspace(userId: string, newWorkspaceId: string) {
+  //   const user = await User.findById(userId);
+  //   if (!user) throw new AppError(404, "User not found.");
+  //   if (!user.workspaceIds.includes(newWorkspaceId as any)) {
+  //     throw new AppError(403, "You do not have access to this workspace.");
+  //   }
+  //   user.lastAccessedWorkspaceId = newWorkspaceId as any;
+  //   await user.save({ validateBeforeSave: false });
 
-    const accessToken = user.generateAccessToken(newWorkspaceId as string);
-    return { accessToken };
+  //   const accessToken = user.generateAccessToken(newWorkspaceId as string);
+  //   return { accessToken };
+  // }
+
+  // view members in the workspace
+  static async getWorkspaceMembers(workspaceId: string) {
+    const members = await UserWorkspace.find({ workspaceId }).populate(
+      "userId",
+      "name email",
+    );
+    return members;
+  }
+
+  // update roles of admin and member
+  static async updateMemberRole(
+    workspaceId: string,
+    memberId: string,
+    currentUserId: string,
+    newRole: "member" | "admin" | "owner",
+  ) {
+    if (newRole === "owner") {
+      throw new AppError(400, "Cannot assign Owner role to other users.");
+    }
+
+    const targetMember = await UserWorkspace.findOne({
+      userId: memberId,
+      workspaceId: workspaceId,
+    });
+    if (!targetMember) throw new AppError(404, "Member not found.");
+
+    if (targetMember.workspaceId.toString() !== workspaceId) {
+      throw new AppError(400, "Member does not belong to this workspace.");
+    }
+
+    if (targetMember.userId.toString() === currentUserId) {
+      throw new AppError(403, "Cannot change your own role.");
+    }
+
+    if (targetMember.role === "owner") {
+      throw new AppError(403, "Cannot change the role of the Owner.");
+    }
+
+    targetMember.role = newRole;
+    await targetMember.save();
   }
 }

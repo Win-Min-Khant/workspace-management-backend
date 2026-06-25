@@ -5,6 +5,7 @@ export interface IUWorkspace extends Document {
   userId: Types.ObjectId;
   workspaceId: Types.ObjectId;
   role: "admin" | "member" | "owner";
+  status: "active" | "suspended" | "invited";
 }
 
 const userWorkspaceSchema = new mongoose.Schema<IUWorkspace>(
@@ -21,6 +22,11 @@ const userWorkspaceSchema = new mongoose.Schema<IUWorkspace>(
       type: String,
       enum: ["admin", "member", "owner"],
       default: "owner",
+    },
+    status: {
+      type: String,
+      enum: ["active", "suspended", "invited"],
+      default: "active",
     },
   },
   {
