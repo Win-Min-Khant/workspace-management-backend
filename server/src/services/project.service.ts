@@ -20,6 +20,14 @@ interface ViewProjectDTO {
   role: "owner" | "admin" | "member";
 }
 
+interface UpdateProjectDTO {
+  name?: string;
+  description?: string;
+  status?: "planning" | "active" | "completed";
+  startDate?: string | Date;
+  endDate?: string | Date;
+}
+
 export class ProjectService {
   // create project
   static async createProject(data: CreateProjectDTO) {
@@ -75,6 +83,81 @@ export class ProjectService {
         workspaceId,
         _id: { $in: projectIds },
       }).select("_id");
+    }
+  }
+
+  // update project
+  static async updateProject(
+    projectId: string,
+    workspaceId: string,
+    updateData: UpdateProjectDTO,
+  ) {
+    const formattedData: any = { ...updateData };
+
+    if (updateData.startDate)
+      formattedData.startDate = new Date(updateData.startDate);
+    if (updateData.endDate)
+      formattedData.endDate = new Date(updateData.endDate);
+
+    const updatedProject = await Project.findOneAndUpdate(
+      { _id: projectId, workspaceId },
+      { $set: formattedData },
+      { returnDocument: "after", runValidators: true },
+    );
+
+    if (!updatedProject) {
+      throw new Error(
+        "Project not found or does not belong to this workspace.",
+      );
+    }
+
+    return updatedProject;
+  }
+
+  // delete project
+  static async deleteProject(
+    projectId: string,
+    workspaceId: string,
+    userId: string,
+  ) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      const project = await Project.findOneAndDelete({
+        _id: projectId,
+        workspaceId,
+      });
+      if (!project) {
+        throw new Error("Project not found or you don't have permission.");
+      }
+      await ProjectMember.deleteMany({ projectId }, { session });
+      await session.commitTransaction();
+      return true;
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
+  // assign members to project
+  static async manageMember(
+    projectId: string,
+    userIdToAssign: string,
+    action: "add" | "remove",
+  ) {
+    if (action === "add") {
+      return await ProjectMember.findOneAndUpdate(
+        { projectId, userId: userIdToAssign },
+        { projectId, userId: userIdToAssign },
+        { upsert: true, returnDocument: "after" },
+      );
+    } else {
+      return await ProjectMember.findOneAndDelete({
+        projectId,
+        userId: userIdToAssign,
+      });
     }
   }
 }
