@@ -201,4 +201,32 @@ export class Workspace {
     targetMember.role = newRole;
     await targetMember.save();
   }
+
+  // delete roles of admin and member
+  static async deleteMember(
+    workspaceId: string,
+    memberId: string,
+    currentUserId: string,
+  ) {
+    const currentUserMembership = await UserWorkspace.findOne({
+      userId: currentUserId,
+      workspaceId,
+    });
+    if (!currentUserMembership)
+      throw new AppError(403, "You are not a member of this workspace.");
+    const targetUserMembership = await UserWorkspace.findOneAndDelete({
+      userId: memberId,
+      workspaceId,
+    });
+    if (!targetUserMembership) throw new AppError(404, "Member not found.");
+    if (currentUserMembership.role === "admin") {
+      if (targetUserMembership.role === "admin") {
+        throw new AppError(
+          403,
+          "Admin cannot remove other Admins. Only Owners can.",
+        );
+      }
+    }
+    await UserWorkspace.findByIdAndDelete(memberId);
+  }
 }

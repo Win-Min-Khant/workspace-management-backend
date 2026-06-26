@@ -7,6 +7,7 @@ import {
 } from "../middlewares/protect.middleware.js";
 import {
   createWorkspace,
+  deleteMember,
   deleteWorkspace,
   getWorkspaceDetails,
   updateMemberRole,
@@ -34,6 +35,12 @@ router.patch(
   protect,
   isOwner,
   updateMemberRole,
+);
+router.delete(
+  "/:workspaceId/members/:memberId",
+  protect,
+  isOwnerOrAdmin,
+  deleteMember,
 );
 router.delete("/delete/:id", protect, isOwner, deleteWorkspace);
 export default router;

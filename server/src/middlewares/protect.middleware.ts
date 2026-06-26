@@ -125,7 +125,7 @@ export const isOwnerOrAdmin = asyncHandler(
       );
     }
 
-    if (req.body.role === "admin" && membership.role !== "owner") {
+    if (membership.role !== "owner") {
       throw new AppError(403, "Only owners can assign admin roles.");
     }
     next();

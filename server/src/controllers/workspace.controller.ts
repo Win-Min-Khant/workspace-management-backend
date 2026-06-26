@@ -123,3 +123,23 @@ export const updateMemberRole = asyncHandler(
     });
   },
 );
+
+// @route PATCH | api/workspace/:workspaceId/members/:memberId
+// @desc PATCH Delete role of admin and members
+// @access Private (Owner/Admin)
+export const deleteMember = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    const { workspaceId, memberId } = req.params;
+    const currentUserId = req.user?.userId;
+    const result = await Workspace.deleteMember(
+      workspaceId as string,
+      memberId as string,
+      currentUserId as string,
+    );
+    res.status(200).json({
+      success: true,
+      message: "Member removed from workspace successfully.",
+      data: result,
+    });
+  },
+);
