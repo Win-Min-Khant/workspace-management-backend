@@ -7,6 +7,7 @@ import authRoutes from "./routes/auth.routes.js";
 import errorHandler from "./middlewares/errorHandler.middleware.js";
 import workspaceRoutes from "./routes/workspace.routes.js";
 import inviteRoutes from "./routes/invitation.routes.js";
+import projectRoutes from "./routes/project.routes.js";
 
 // dotenv config
 dotenv.config({
@@ -30,6 +31,7 @@ app.use(cookieParser());
 app.use("/api/auth", authRoutes);
 app.use("/api/workspace", workspaceRoutes);
 app.use("/api/invitation", inviteRoutes);
+app.use("/api/workspace", projectRoutes);
 
 // debug route list
 // custom middlewares
