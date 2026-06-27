@@ -65,9 +65,8 @@ export const updateTask = asyncHandler(
 // @access Private (Member)
 export const updateTaskStatus = asyncHandler(
   async (req: AuthRequest, res: Response) => {
-    const userId = req.user?.userId;
     const taskId = req.params.taskId;
-    const { status } = req.body;
+    const { userId, status } = req.body;
     const statusType = ["todo", "in-progress", "done"];
     if (!statusType.includes(status)) {
       return res.status(400).json({ message: "Invalid status" });
