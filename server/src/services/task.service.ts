@@ -11,6 +11,8 @@ import mongoose from "mongoose";
 import { Project } from "../models/project.model.js";
 import { ProjectMember } from "../models/project_member.model.js";
 import { Task } from "../models/task.model.js";
+import { UserWorkspace } from "../models/user_workspace.model.js";
+import { AppError } from "../utils/appError.js";
 
 interface CreateTaskDTO {
   title: string;
@@ -26,6 +28,7 @@ interface CreateTaskDTO {
 }
 
 export class TaskService {
+  // create task
   static async createTask(data: CreateTaskDTO) {
     const { projectId, assigneeId, workspaceId } = data;
 
@@ -34,7 +37,7 @@ export class TaskService {
       projectId,
     });
     // console.log(`assigneeId: ${assigneeId}, projectId - ${projectId}`);
-    if (!project) throw new Error("Project not found");
+    if (!project) throw new AppError(404, "Project not found");
 
     return await Task.create({
       ...data,
@@ -42,5 +45,23 @@ export class TaskService {
       assignedAt: new Date(),
       status: "todo",
     });
+  }
+
+  // view tasks
+  static async getAllTasks(workspaceId: string, user: any) {
+    let query: any = { workspaceId };
+    const userId = user.userId;
+    const membership = await UserWorkspace.findOne({
+      userId: String(userId),
+      workspaceId: String(workspaceId),
+    });
+    if (!membership)
+      throw new AppError(404, "You don't have access to the workspace.");
+    if (membership.role === "member") {
+      query.assigneeId = membership._id;
+    }
+    return await Task.find(query)
+      .populate("assigneeId", "name email")
+      .sort({ createdAt: -1 });
   }
 }
