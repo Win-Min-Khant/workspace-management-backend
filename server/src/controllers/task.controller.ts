@@ -60,8 +60,8 @@ export const updateTask = asyncHandler(
   },
 );
 
-// @route DELETE | api/workspace/:workspaceId/projects/:projectId/tasks/:taskId
-// @desc DELETE Update status of task as a member
+// @route PATCH | api/workspace/:workspaceId/projects/:projectId/tasks/:taskId
+// @desc PATCH Update status of task as a member
 // @access Private (Member)
 export const updateTaskStatus = asyncHandler(
   async (req: AuthRequest, res: Response) => {
@@ -81,6 +81,24 @@ export const updateTaskStatus = asyncHandler(
       success: true,
       message: "Task status is updated successfully.",
       data: result,
+    });
+  },
+);
+
+// @route DELETE | api/workspace/:workspaceId/projects/:projectId/tasks/:taskId
+// @desc DELETE Delete the task of member
+// @access Private (Owner/Admin)
+export const deleteTask = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    const { taskId, workspaceId, projectId } = req.params;
+    await TaskService.deleteTask(
+      taskId as string,
+      workspaceId as string,
+      projectId as string,
+    );
+    res.status(200).json({
+      success: true,
+      message: "Task is deleted successfully.",
     });
   },
 );

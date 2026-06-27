@@ -103,4 +103,19 @@ export class TaskService {
       );
     return updatedTaskStatus;
   }
+
+  // delete task
+  static async deleteTask(
+    taskId: string,
+    workspaceId: string,
+    projectId: string,
+  ) {
+    const task = await Task.findOneAndDelete({
+      _id: taskId,
+      workspaceId,
+      projectId,
+    });
+    if (!task) throw new Error("Task not found in this workspace.");
+    return task;
+  }
 }
