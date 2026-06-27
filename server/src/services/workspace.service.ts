@@ -214,13 +214,15 @@ export class Workspace {
     });
     if (!currentUserMembership)
       throw new AppError(403, "You are not a member of this workspace.");
-    const targetUserMembership = await UserWorkspace.findOneAndDelete({
+    const targetUserMembership = await UserWorkspace.findOne({
       userId: memberId,
       workspaceId,
     });
     if (!targetUserMembership) throw new AppError(404, "Member not found.");
     if (currentUserMembership.role === "admin") {
-      if (targetUserMembership.role === "admin") {
+      if (targetUserMembership.role === "owner") {
+        throw new AppError(403, "Admin cannot remove Owners.");
+      } else if (targetUserMembership.role === "admin") {
         throw new AppError(
           403,
           "Admin cannot remove other Admins. Only Owners can.",

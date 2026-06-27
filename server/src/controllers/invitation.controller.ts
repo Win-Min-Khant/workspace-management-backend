@@ -4,6 +4,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { InvitationService } from "../services/invitation.service.js";
 import { AppError } from "../utils/appError.js";
 import jwt from "jsonwebtoken";
+import { UserWorkspace } from "../models/user_workspace.model.js";
 
 // @route POST | api/api/invitation/:workspaceId/send
 // @desc Send invitation to admin and member with role access
@@ -13,6 +14,15 @@ export const sendInvitation = asyncHandler(
     const { email, role } = req.body;
     const invitedBy = req.user?.userId;
     const workspaceId = req.params.workspaceId;
+    const membership = await UserWorkspace.findOne({
+      userId: String(invitedBy),
+      workspaceId: String(workspaceId),
+    });
+    if (!membership)
+      throw new AppError(404, "You does not belong to the workspace.");
+    if (membership.role === "admin" && role === "admin") {
+      throw new AppError(403, "You cannot invite other members as admin.");
+    }
     const result = await InvitationService.sendInvitation(
       email,
       workspaceId as string,

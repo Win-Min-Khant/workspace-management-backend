@@ -1,22 +1,19 @@
 import { Router } from "express";
-import { isOwnerOrAdmin, protect } from "../middlewares/protect.middleware.js";
+import { protect, isOwnerOrAdmin } from "../middlewares/protect.middleware.js";
 import {
   createProject,
-  deleteProject,
   getProjects,
-  manageMember,
   updateProject,
+  deleteProject,
+  manageMember,
 } from "../controllers/project.controller.js";
 
-const router = Router();
-router.post(
-  "/:workspaceId/projects/create",
-  protect,
-  isOwnerOrAdmin,
-  createProject,
-);
-router.get("/:workspaceId/projects", protect, getProjects);
-router.patch("/:workspaceId/projects/:projectId", protect, updateProject);
-router.delete("/:workspaceId/projects/:projectId", protect, deleteProject);
-router.post("/:workspaceId/projects/:projectId/members", protect, manageMember);
+const router = Router({ mergeParams: true });
+
+router.post("/", protect, isOwnerOrAdmin, createProject);
+router.get("/", protect, getProjects);
+router.patch("/:projectId", protect, isOwnerOrAdmin, updateProject);
+router.delete("/:projectId", protect, isOwnerOrAdmin, deleteProject);
+router.post("/:projectId/members", protect, isOwnerOrAdmin, manageMember);
+
 export default router;

@@ -7,7 +7,7 @@ export interface ITask extends mongoose.Document {
   priority: "low" | "medium" | "high";
   projectId: Types.ObjectId;
   workspaceId: Types.ObjectId;
-  assigneeId?: Types.ObjectId;
+  assigneeId?: Types.ObjectId | null;
   dueDate?: Date;
 }
 
@@ -25,13 +25,21 @@ const taskSchema = new Schema<ITask>(
       enum: ["low", "medium", "high"],
       default: "medium",
     },
-    projectId: { type: Schema.Types.ObjectId, ref: "Project", required: true },
+    projectId: {
+      type: Schema.Types.ObjectId,
+      ref: "Project",
+      required: true,
+    },
     workspaceId: {
       type: Schema.Types.ObjectId,
       ref: "Workspace",
       required: true,
     },
-    assigneeId: { type: Schema.Types.ObjectId, ref: "User" },
+    assigneeId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
     dueDate: Date,
   },
   { timestamps: true },

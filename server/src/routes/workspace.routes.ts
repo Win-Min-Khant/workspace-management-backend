@@ -1,9 +1,9 @@
 import { Router } from "express";
 import {
+  protect,
   isMember,
   isOwner,
   isOwnerOrAdmin,
-  protect,
 } from "../middlewares/protect.middleware.js";
 import {
   createWorkspace,
@@ -16,12 +16,12 @@ import {
 import { validateWorkspaceUpdate } from "../validations/workspace.validation.js";
 import { validate } from "../middlewares/validation.middleware.js";
 
-const router = Router();
+const router = Router({ mergeParams: true });
 
 router.post("/create", protect, createWorkspace);
-// router.post("/switch/:id", protect, switchWorkspace);
 router.get("/details", protect, isOwnerOrAdmin, getWorkspaceDetails);
-router.get("/:workspaceId/members", protect, isMember, getWorkspaceDetails);
+router.delete("/delete/:id", protect, isOwner, deleteWorkspace);
+
 router.post(
   "/settings",
   validateWorkspaceUpdate,
@@ -30,6 +30,8 @@ router.post(
   isOwner,
   updateWorkspace,
 );
+
+router.get("/:workspaceId/members", protect, isMember, getWorkspaceDetails);
 router.patch(
   "/:workspaceId/members/:memberId/role",
   protect,
@@ -42,5 +44,5 @@ router.delete(
   isOwnerOrAdmin,
   deleteMember,
 );
-router.delete("/delete/:id", protect, isOwner, deleteWorkspace);
+
 export default router;

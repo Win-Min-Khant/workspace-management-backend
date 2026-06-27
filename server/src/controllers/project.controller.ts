@@ -120,7 +120,7 @@ export const manageMember = asyncHandler(
   async (req: AuthRequest, res: Response) => {
     const { workspaceId, projectId } = req.params;
     const { userIdToAssign, action } = req.body;
-    console.log(`userIdToAssign - ${userIdToAssign} and action - ${action}`);
+    // console.log(`userIdToAssign - ${userIdToAssign} and action - ${action}`);
     const isWorkspaceMember = await UserWorkspace.findOne({
       workspaceId: String(workspaceId),
       userId: userIdToAssign,

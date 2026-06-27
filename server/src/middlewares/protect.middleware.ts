@@ -125,9 +125,9 @@ export const isOwnerOrAdmin = asyncHandler(
       );
     }
 
-    if (membership.role !== "owner") {
-      throw new AppError(403, "Only owners can assign admin roles.");
-    }
+    // if (membership.role !== "owner") {
+    //   throw new AppError(403, "Only owners can assign admin roles.");
+    // }
     next();
   },
 );
@@ -147,7 +147,7 @@ export const isMember = asyncHandler(
       throw new AppError(403, "You do not have access to this workspace.");
     }
 
-    (req as any).membership = membership;
+    // (req as any).membership = membership;
 
     next();
   },
