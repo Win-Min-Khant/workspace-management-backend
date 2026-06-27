@@ -11,10 +11,17 @@ export const validateMember = async (userId: string, workspaceId: string) => {
 
 export const createTask = asyncHandler(
   async (req: AuthRequest, res: Response) => {
+    const { workspaceId, projectId } = req.params;
+    const assignedBy = req.user?.userId;
     if (req.body.assigneeId) {
-      await validateMember(req.body.assigneeId, req.body.workspaceId);
+      await validateMember(req.body.assigneeId, String(workspaceId));
     }
-    const task = await TaskService.createTask(req.body);
+    const task = await TaskService.createTask({
+      ...req.body,
+      workspaceId,
+      projectId,
+      assignedBy,
+    });
     res.status(201).json({ success: true, data: task });
   },
 );
