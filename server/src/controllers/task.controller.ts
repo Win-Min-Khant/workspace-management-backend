@@ -60,6 +60,27 @@ export const updateTask = asyncHandler(
   },
 );
 
-// @route PATCH | api/workspace/:workspaceId/projects/:projectId/tasks/:taskId
-// @desc PATCH Update task details
-// @access Private (Owner/Admin)
+// @route DELETE | api/workspace/:workspaceId/projects/:projectId/tasks/:taskId
+// @desc DELETE Update status of task as a member
+// @access Private (Member)
+export const updateTaskStatus = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    const userId = req.user?.userId;
+    const taskId = req.params.taskId;
+    const { status } = req.body;
+    const statusType = ["todo", "in-progress", "done"];
+    if (!statusType.includes(status)) {
+      return res.status(400).json({ message: "Invalid status" });
+    }
+    const result = await TaskService.updateTaskStatus(
+      taskId as string,
+      userId as string,
+      status,
+    );
+    res.status(200).json({
+      success: true,
+      message: "Task status is updated successfully.",
+      data: result,
+    });
+  },
+);

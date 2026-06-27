@@ -30,6 +30,10 @@ interface UpdateTaskDTO {
   dueDate?: Date;
 }
 
+interface UpdateStatus {
+  status?: "todo" | "in-progress" | "done";
+}
+
 export class TaskService {
   // create task
   static async createTask(data: CreateTaskDTO) {
@@ -74,5 +78,29 @@ export class TaskService {
       returnDocument: "after",
     });
     return updatedTask;
+  }
+
+  // update status
+  static async updateTaskStatus(
+    taskId: string,
+    userId: string,
+    status: UpdateStatus,
+  ) {
+    const updatedTaskStatus = await Task.findOneAndUpdate(
+      {
+        _id: taskId,
+        assigneeId: userId,
+      },
+      {
+        status,
+      },
+      { returnDocument: "after" },
+    );
+    if (!updatedTaskStatus)
+      throw new AppError(
+        404,
+        "Task not found or unauthorized to update status",
+      );
+    return updatedTaskStatus;
   }
 }
