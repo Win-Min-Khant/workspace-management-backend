@@ -33,22 +33,33 @@ export const createTask = asyncHandler(
 // @route GET | api/workspace/:workspaceId/projects/:projectId/tasks/
 // @desc GET View all tasks
 // @access Private (Owner/Admin/Member)
-// US-022: View Tasks
-// As a user, I want to view tasks so that I can track work.
-// Acceptance Criteria
-// Owner/Admin can view all tasks in workspace.
-// Member can view assigned tasks.
-// Tasks from other workspaces are never returned.
-// Tasks show title, assignee, priority, status, and due date.
-// Technical Rule
-// Task.find({ workspaceId:req.user.workspaceId })
 export const getAllTasks = asyncHandler(
   async (req: AuthRequest, res: Response) => {
     const { workspaceId, projectId } = req.params;
     const tasks = await TaskService.getAllTasks(
       workspaceId as string,
+      projectId as string,
       req.user,
     );
     res.status(200).json({ success: true, count: tasks.length, tasks });
   },
 );
+
+// @route PATCH | api/workspace/:workspaceId/projects/:projectId/tasks/:taskId
+// @desc PATCH Update task details
+// @access Private (Owner/Admin)
+export const updateTask = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    const { taskId } = req.params;
+    const result = await TaskService.updateTask(taskId as string, req.body);
+    res.status(200).json({
+      success: true,
+      message: "Task is updated successfully.",
+      data: result,
+    });
+  },
+);
+
+// @route PATCH | api/workspace/:workspaceId/projects/:projectId/tasks/:taskId
+// @desc PATCH Update task details
+// @access Private (Owner/Admin)
