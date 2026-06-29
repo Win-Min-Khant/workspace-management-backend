@@ -10,6 +10,7 @@ import inviteRoutes from "./routes/invitation.routes.js";
 import projectRoutes from "./routes/project.routes.js";
 import taskRoutes from "./routes/task.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
+import commentRoutes from "./routes/comment.routes.js";
 
 // dotenv config
 dotenv.config({
@@ -36,6 +37,7 @@ app.use("/api/invitation", inviteRoutes);
 app.use("/api/workspaces/:workspaceId/projects", projectRoutes);
 app.use("/api/workspaces/:workspaceId/tasks", taskRoutes);
 app.use("/api/workspaces/:workspaceId/dashboard", dashboardRoutes);
+app.use("/api/workspaces/:workspaceId/tasks/:taskId/comments", commentRoutes);
 
 // debug route list
 // custom middlewares
