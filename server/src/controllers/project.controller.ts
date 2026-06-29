@@ -43,30 +43,30 @@ export const createProject = asyncHandler(
 // @route POST | api/workspace/:workspaceId/projects/create
 // @desc POST Create a new project
 // @access Private (Owner/Admin)
-export const getProjects = asyncHandler(
-  async (req: AuthRequest, res: Response) => {
-    const { workspaceId } = req.params;
-    const userId = req.user?.userId;
-    const membership = await UserWorkspace.findOne({
-      workspaceId: String(workspaceId),
-      userId: String(userId),
-    });
-    if (!membership) {
-      throw new AppError(403, "Access denied: You are not in this workspace.");
-    }
-    const projects = await ProjectService.getProjects({
-      userId: String(userId),
-      workspaceId: String(workspaceId),
-      role: membership.role,
-    });
+// export const getProjects = asyncHandler(
+//   async (req: AuthRequest, res: Response) => {
+//     const { workspaceId } = req.params;
+//     const userId = req.user?.userId;
+//     const membership = await UserWorkspace.findOne({
+//       workspaceId: String(workspaceId),
+//       userId: String(userId),
+//     });
+//     if (!membership) {
+//       throw new AppError(403, "Access denied: You are not in this workspace.");
+//     }
+//     const projects = await ProjectService.getProjects({
+//       userId: String(userId),
+//       workspaceId: String(workspaceId),
+//       role: membership.role,
+//     });
 
-    res.status(200).json({
-      success: true,
-      count: projects.length,
-      data: projects,
-    });
-  },
-);
+//     res.status(200).json({
+//       success: true,
+//       count: projects.length,
+//       data: projects,
+//     });
+//   },
+// );
 
 // @route PATCH | api/workspace/:workspaceId/projects/:projectId
 // @desc PATCH Update an existing project
@@ -137,5 +137,32 @@ export const manageMember = asyncHandler(
       success: true,
       message: `Member ${action === "add" ? "added to" : "removed from"} project.`,
     });
+  },
+);
+
+export const getProjects = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    const { workspaceId } = req.params;
+    const { search, status } = req.query;
+    const userId = req.user?.userId;
+    const membership = await UserWorkspace.findOne({
+      userId: String(userId),
+      workspaceId: String(workspaceId),
+    });
+    if (!membership) {
+      throw new AppError(404, "User not found in this workspace.");
+    }
+
+    const role = membership.role;
+
+    const projects = await ProjectService.getProjects(
+      workspaceId as string,
+      userId as string,
+      role,
+      search as string,
+      status as string,
+    );
+
+    res.status(200).json({ success: true, data: projects });
   },
 );

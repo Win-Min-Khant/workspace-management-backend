@@ -71,19 +71,45 @@ export class ProjectService {
   }
 
   // view project
-  static async getProjects(data: ViewProjectDTO) {
-    const { userId, workspaceId, role } = data;
-    if (role === "owner" || role === "admin") {
-      const projects = await Project.find({ workspaceId });
-      return projects;
-    } else {
-      const projectIds = await ProjectMember.distinct("projectId", { userId });
+  // static async getProjects(data: ViewProjectDTO) {
+  //   const { userId, workspaceId, role } = data;
+  //   if (role === "owner" || role === "admin") {
+  //     const projects = await Project.find({ workspaceId });
+  //     return projects;
+  //   } else {
+  //     const projectIds = await ProjectMember.distinct("projectId", { userId });
 
-      return await Project.find({
-        workspaceId,
-        _id: { $in: projectIds },
-      }).select("_id");
+  //     return await Project.find({
+  //       workspaceId,
+  //       _id: { $in: projectIds },
+  //     }).select("_id");
+  //   }
+  // }
+
+  // search and filter of projects
+  static async getProjects(
+    workspaceId: string,
+    userId: string,
+    role: string,
+    search?: string,
+    status?: string,
+  ) {
+    const query: any = { workspaceId };
+
+    if (role !== "owner" && role !== "admin") {
+      const projectsOfMember = await ProjectMember.find({ userId });
+      query._id = { $in: projectsOfMember.map((m) => m.projectId) };
     }
+
+    if (search) {
+      query.name = { $regex: search, $options: "i" };
+    }
+
+    if (status) {
+      query.status = status;
+    }
+
+    return await Project.find(query);
   }
 
   // update project

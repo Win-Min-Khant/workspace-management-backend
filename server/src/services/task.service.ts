@@ -3,6 +3,7 @@ import { ProjectMember } from "../models/project_member.model.js";
 import { Task } from "../models/task.model.js";
 import { UserWorkspace } from "../models/user_workspace.model.js";
 import { AppError } from "../utils/appError.js";
+import { Project } from "../models/project.model.js";
 
 interface CreateTaskDTO {
   title: string;

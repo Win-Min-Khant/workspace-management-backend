@@ -56,7 +56,7 @@ export class DashboardService {
     });
 
     const assignedTasks = await Task.find({ workspaceId, assigneeId: userId })
-      .populate("projectId", "title")
+      .populate("projectId", "name")
       .sort({ createdAt: -1 });
 
     return {
