@@ -55,22 +55,55 @@ export class TaskService {
     });
   }
 
-  // view tasks
-  static async getAllTasks(workspaceId: string, projectId: string, user: any) {
-    let query: any = { workspaceId, projectId };
-    const userId = user.userId;
-    const membership = await UserWorkspace.findOne({
-      userId: String(userId),
-      workspaceId: String(workspaceId),
-    });
-    if (!membership)
-      throw new AppError(404, "You don't have access to the workspace.");
-    if (membership.role === "member") {
-      query.assigneeId = membership._id;
+  // view tasks by query
+  // static async getAllTasks(workspaceId: string, projectId: string, user: any) {
+  //   let query: any = { workspaceId, projectId };
+  //   const userId = user.userId;
+  //   const membership = await UserWorkspace.findOne({
+  //     userId: String(userId),
+  //     workspaceId: String(workspaceId),
+  //   });
+  //   if (!membership)
+  //     throw new AppError(404, "You don't have access to the workspace.");
+  //   if (membership.role === "member") {
+  //     query.assigneeId = membership._id;
+  //   }
+  //   return await Task.find(query)
+  //     .populate("assigneeId", "name email")
+  //     .sort({ createdAt: -1 });
+  // }
+  static async getTasksByQuery(
+    workspaceId: string,
+    userId: string,
+    role: string,
+    search?: string,
+    status?: string,
+    priority?: string,
+    assigneeId?: string,
+  ) {
+    const query: any = { workspaceId };
+
+    if (role !== "owner" && role !== "admin") {
+      query.assigneeId = userId;
     }
-    return await Task.find(query)
-      .populate("assigneeId", "name email")
-      .sort({ createdAt: -1 });
+
+    if (search) {
+      query.title = { $regex: search, $options: "i" };
+    }
+
+    if (status) {
+      query.status = status;
+    }
+
+    if (priority) {
+      query.priority = priority;
+    }
+
+    if ((role === "owner" || role === "admin") && assigneeId) {
+      query.assigneeId = assigneeId;
+    }
+
+    return await Task.find(query).populate("assigneeId", "name");
   }
 
   // update task

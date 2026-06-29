@@ -34,7 +34,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/workspace", workspaceRoutes);
 app.use("/api/invitation", inviteRoutes);
 app.use("/api/workspaces/:workspaceId/projects", projectRoutes);
-app.use("/api/workspaces/:workspaceId/projects/:projectId/tasks", taskRoutes);
+app.use("/api/workspaces/:workspaceId/tasks", taskRoutes);
 app.use("/api/workspaces/:workspaceId/dashboard", dashboardRoutes);
 
 // debug route list

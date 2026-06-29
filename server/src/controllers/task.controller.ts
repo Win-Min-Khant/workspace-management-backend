@@ -15,7 +15,7 @@ export const validateMember = async (userId: string, workspaceId: string) => {
 // @access Private (Owner/Admin)
 export const createTask = asyncHandler(
   async (req: AuthRequest, res: Response) => {
-    const { workspaceId, projectId } = req.params;
+    const { workspaceId } = req.params;
     const assignedBy = req.user?.userId;
     if (req.body.assigneeId) {
       await validateMember(req.body.assigneeId, String(workspaceId));
@@ -23,7 +23,6 @@ export const createTask = asyncHandler(
     const task = await TaskService.createTask({
       ...req.body,
       workspaceId,
-      projectId,
       assignedBy,
     });
     res.status(201).json({ success: true, data: task });
@@ -33,15 +32,39 @@ export const createTask = asyncHandler(
 // @route GET | api/workspace/:workspaceId/projects/:projectId/tasks/
 // @desc GET View all tasks
 // @access Private (Owner/Admin/Member)
-export const getAllTasks = asyncHandler(
+// export const getAllTasks = asyncHandler(
+//   async (req: AuthRequest, res: Response) => {
+//     const { workspaceId, projectId } = req.params;
+//     const tasks = await TaskService.getAllTasks(
+//       workspaceId as string,
+//       projectId as string,
+//       req.user,
+//     );
+//     res.status(200).json({ success: true, count: tasks.length, tasks });
+//   },
+// );
+export const getTasksByQuery = asyncHandler(
   async (req: AuthRequest, res: Response) => {
-    const { workspaceId, projectId } = req.params;
-    const tasks = await TaskService.getAllTasks(
+    const { workspaceId } = req.params;
+    const userId = req.user?.userId;
+    const { search, status, priority, assigneeId } = req.query;
+    const membership = await UserWorkspace.findOne({
+      userId: String(userId),
+      workspaceId: String(workspaceId),
+    });
+    if (!membership)
+      throw new AppError(404, "User not found in this workspace.");
+    const role = membership.role;
+    const tasks = await TaskService.getTasksByQuery(
       workspaceId as string,
-      projectId as string,
-      req.user,
+      userId as string,
+      role as string,
+      search as string,
+      status as string,
+      priority as string,
+      assigneeId as string,
     );
-    res.status(200).json({ success: true, count: tasks.length, tasks });
+    res.status(200).json({ success: true, data: tasks });
   },
 );
 

@@ -18,9 +18,21 @@ import { validate } from "../middlewares/validation.middleware.js";
 
 const router = Router({ mergeParams: true });
 
-router.post("/create", protect, createWorkspace);
-router.get("/details", protect, isOwnerOrAdmin, getWorkspaceDetails);
-router.delete("/delete/:id", protect, isOwner, deleteWorkspace);
+router.post("/", protect, createWorkspace);
+
+router
+  .route("/:workspaceId")
+  .get(protect, isOwnerOrAdmin, getWorkspaceDetails)
+  .patch(protect, isOwner, validateWorkspaceUpdate, validate, updateWorkspace)
+  .delete(protect, isOwner, deleteWorkspace);
+
+// router.route("/:workspaceId/members")
+//   .get(protect, isMember, getWorkspaceMembers);
+
+router
+  .route("/:workspaceId/members/:memberId")
+  .patch(protect, isOwner, updateMemberRole)
+  .delete(protect, isOwnerOrAdmin, deleteMember);
 
 router.post(
   "/settings",
@@ -31,18 +43,6 @@ router.post(
   updateWorkspace,
 );
 
-router.get("/:workspaceId/members", protect, isMember, getWorkspaceDetails);
-router.patch(
-  "/:workspaceId/members/:memberId/role",
-  protect,
-  isOwner,
-  updateMemberRole,
-);
-router.delete(
-  "/:workspaceId/members/:memberId",
-  protect,
-  isOwnerOrAdmin,
-  deleteMember,
-);
+// router.get("/:workspaceId/members", protect, isMember, getWorkspaceDetails);
 
 export default router;

@@ -10,10 +10,14 @@ import {
 
 const router = Router({ mergeParams: true });
 
-router.post("/", protect, isOwnerOrAdmin, createProject);
-router.get("/", protect, getProjects);
-router.patch("/:projectId", protect, isOwnerOrAdmin, updateProject);
-router.delete("/:projectId", protect, isOwnerOrAdmin, deleteProject);
-router.post("/:projectId/members", protect, isOwnerOrAdmin, manageMember);
+router
+  .route("/")
+  .post(protect, isOwnerOrAdmin, createProject)
+  .get(protect, getProjects);
+router
+  .route("/:projectId")
+  .patch(protect, isOwnerOrAdmin, updateProject)
+  .delete(protect, isOwnerOrAdmin, deleteProject);
+router.route("/:projectId/members").post(protect, isOwnerOrAdmin, manageMember);
 
 export default router;

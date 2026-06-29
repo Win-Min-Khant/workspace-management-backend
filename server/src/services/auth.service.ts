@@ -45,7 +45,6 @@ export class AuthService {
             name,
             email,
             password,
-            // workspaceIds: [newWorkspace._id],
           },
         ],
         { session },

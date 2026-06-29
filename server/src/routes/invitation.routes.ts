@@ -7,8 +7,9 @@ import {
 
 const router = Router({ mergeParams: true });
 
-router.post("/:workspaceId/send", protect, isOwnerOrAdmin, sendInvitation);
-
-router.post("/accept/:token", acceptInvitation);
+router
+  .route("/:workspaceId/send")
+  .post(protect, isOwnerOrAdmin, sendInvitation);
+router.route("/accept/:token").post(acceptInvitation);
 
 export default router;
