@@ -4,6 +4,7 @@ import { Task } from "../models/task.model.js";
 import { UserWorkspace } from "../models/user_workspace.model.js";
 import { AppError } from "../utils/appError.js";
 import { Project } from "../models/project.model.js";
+import { Activity } from "./activity.service.js";
 
 interface CreateTaskDTO {
   title: string;
@@ -47,12 +48,23 @@ export class TaskService {
     // console.log(`assigneeId: ${assigneeId}, projectId - ${projectId}`);
     if (!project) throw new AppError(404, "Project not found");
 
-    return await Task.create({
+    const task = await Task.create({
       ...data,
       workspaceId,
       assignedAt: new Date(),
       status: "todo",
     });
+
+    await Activity.logActivity(
+      workspaceId,
+      data.assignedBy!,
+      "TASK_CREATED",
+      task._id.toString(),
+      "TASK",
+      `Task '${task.title}' was created.`,
+    );
+
+    return task;
   }
 
   // view tasks by query
@@ -119,6 +131,7 @@ export class TaskService {
     taskId: string,
     userId: string,
     status: UpdateStatus,
+    workspaceId: string,
   ) {
     const updatedTaskStatus = await Task.findOneAndUpdate(
       {
@@ -135,11 +148,20 @@ export class TaskService {
         404,
         "Task not found or unauthorized to update status",
       );
+    await Activity.logActivity(
+      workspaceId,
+      userId,
+      "TASK_STATUS_CHANGED",
+      taskId,
+      "TASK",
+      `Task status changed to '${status}'.`,
+    );
     return updatedTaskStatus;
   }
 
   // delete task
   static async deleteTask(
+    userId: string,
     taskId: string,
     workspaceId: string,
     projectId: string,
@@ -150,6 +172,14 @@ export class TaskService {
       projectId,
     });
     if (!task) throw new Error("Task not found in this workspace.");
+    await Activity.logActivity(
+      workspaceId,
+      userId,
+      "TASK_DELETED",
+      taskId,
+      "TASK",
+      `Task '${task.title}' was deleted.`,
+    );
     return task;
   }
 }

@@ -3,14 +3,11 @@ import type { Image, UserRole } from "../types/auth.types.js";
 import bcrypt from "bcryptjs";
 import jwt, { type Secret, type SignOptions } from "jsonwebtoken";
 import type { StringValue } from "ms";
-import crypto from "crypto";
 
 export interface IUser extends Document {
   name: string;
   email: string;
   password: string;
-  // role: UserRole;
-  // workspaceIds: Types.ObjectId[];
   refreshToken: string;
   avatar?: Image;
   lastAccessedWorkspaceId?: Types.ObjectId;
@@ -42,7 +39,7 @@ const userSchema = new mongoose.Schema<IUser>(
     avatar: {
       type: {
         image_url: String,
-        public_alt: String,
+        public_id: String,
       },
     },
     refreshToken: {

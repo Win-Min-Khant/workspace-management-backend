@@ -1,5 +1,6 @@
 import { v2 as cloudinary } from "cloudinary";
 import dotenv from "dotenv";
+import streamifier from "streamifier";
 
 dotenv.config({
   path: ".env",
@@ -11,18 +12,22 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET!,
 });
 
-export const uploadSingleImage = async (image: string, folder_name: string) => {
-  const res = await cloudinary.uploader.upload(image, {
-    folder: folder_name,
-  });
+export const uploadToCloudinary = (buffer: Buffer, folder: string) => {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder },
+      (error, result) => {
+        if (error) {
+          return reject(error);
+        }
+        resolve(result);
+      },
+    );
 
-  return {
-    image_url: res.secure_url,
-    public_alt: res.public_id,
-  };
+    streamifier.createReadStream(buffer).pipe(stream);
+  });
 };
 
 export const deleteImage = async (public_alt: string) => {
-  const res = await cloudinary.uploader.destroy(public_alt);
-  return res?.result === "ok";
+  return await cloudinary.uploader.destroy(public_alt);
 };

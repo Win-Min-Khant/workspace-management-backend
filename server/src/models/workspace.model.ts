@@ -7,12 +7,6 @@ export interface IWorkspace extends Document {
   logo?: Image;
   ownerId: Types.ObjectId;
   token: string;
-  // members: [
-  //   {
-  //     userId: string | Types.ObjectId;
-  //     role: "admin" | "member";
-  //   },
-  // ];
 }
 
 const workspaceSchema = new mongoose.Schema<IWorkspace>(
@@ -25,7 +19,7 @@ const workspaceSchema = new mongoose.Schema<IWorkspace>(
     logo: {
       type: {
         image_url: String,
-        public_alt: String,
+        public_id: String,
       },
     },
     ownerId: {
@@ -33,20 +27,6 @@ const workspaceSchema = new mongoose.Schema<IWorkspace>(
       ref: "User",
     },
     token: { type: String },
-    // members: [
-    //   {
-    //     userId: {
-    //       type: Schema.Types.ObjectId,
-    //       ref: "User",
-    //       required: true,
-    //     },
-    //     role: {
-    //       type: String,
-    //       enum: ["admin", "member"],
-    //       default: "member",
-    //     },
-    //   },
-    // ],
   },
   {
     timestamps: true,

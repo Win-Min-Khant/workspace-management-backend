@@ -8,7 +8,10 @@ import { AppError } from "../utils/appError.js";
 // @desc Register new user
 // @access Public
 export const register = asyncHandler(async (req: Request, res: Response) => {
-  const result = await AuthService.register(req.body);
+  const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+  const avatarFile = files?.avatar?.[0];
+  const logoFile = files?.logo?.[0];
+  const result = await AuthService.register(req.body, avatarFile, logoFile);
   res.status(201).json({
     success: true,
     data: result,
@@ -91,16 +94,16 @@ export const updateName = asyncHandler(
 // @route POST | api/auth/upload
 // @desc upload or update user's avatar
 // @access Private
-export const uploadAvatar = asyncHandler(
-  async (req: AuthRequest, res: Response) => {
-    const { image_url } = req.body;
-    const result = await AuthService.uploadAvatar(
-      req.user?.userId as string,
-      image_url,
-    );
-    res.status(200).json({
-      success: true,
-      data: result,
-    });
-  },
-);
+// export const uploadAvatar = asyncHandler(
+//   async (req: AuthRequest, res: Response) => {
+//     const { image_url } = req.body;
+//     const result = await AuthService.uploadAvatar(
+//       req.user?.userId as string,
+//       image_url,
+//     );
+//     res.status(200).json({
+//       success: true,
+//       data: result,
+//     });
+//   },
+// );

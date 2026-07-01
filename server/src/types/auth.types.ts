@@ -4,5 +4,5 @@ export type UserRole = "owner" | "admin" | "member";
 
 export interface Image {
   image_url: string;
-  public_alt: string;
+  public_id: string;
 }

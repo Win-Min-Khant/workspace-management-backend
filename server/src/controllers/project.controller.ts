@@ -87,6 +87,7 @@ export const updateProject = asyncHandler(async (req: any, res: Response) => {
   const updatedProject = await ProjectService.updateProject(
     projectId,
     workspaceId,
+    userId,
     req.body,
   );
 

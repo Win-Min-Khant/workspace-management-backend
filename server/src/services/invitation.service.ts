@@ -8,6 +8,7 @@ import sendEmail from "../utils/sendEmail.js";
 import crypto from "crypto";
 import { generateEmailInviteToken } from "../utils/generateRandonToken.js";
 import { UserWorkspace } from "../models/user_workspace.model.js";
+import { Activity } from "./activity.service.js";
 
 export class InvitationService {
   // send invitation
@@ -35,6 +36,19 @@ export class InvitationService {
       });
       const newInvite = await Invitation.findById(invite._id).select(
         "-inviteToken -inviteTokenExpiresAt",
+      );
+      if (!newInvite)
+        throw new AppError(
+          500,
+          "Invitation was created but could not be retrieved.",
+        );
+      await Activity.logActivity(
+        workspaceId,
+        invitedBy,
+        "USER_INVITED",
+        newInvite._id.toString(),
+        "USER",
+        `Invited ${email} to the workspace.`,
       );
       return newInvite;
     } catch (error) {
@@ -83,6 +97,14 @@ export class InvitationService {
     await Invitation.findByIdAndUpdate(invitation._id, {
       status: "accepted",
     });
+    await Activity.logActivity(
+      invitation.workspaceId.toString(),
+      userId,
+      "USER_JOINED",
+      invitation._id.toString(),
+      "USER",
+      `User accepted the invitation and joined the workspace.`,
+    );
     return { workspaceId: invitation.workspaceId };
   }
 }

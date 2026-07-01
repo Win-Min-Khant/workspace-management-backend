@@ -3,6 +3,7 @@ import { UserWorkspace } from "../models/user_workspace.model.js";
 import { AppError } from "../utils/appError.js";
 import { ProjectMember } from "../models/project_member.model.js";
 import { Project, type IProject } from "../models/project.model.js";
+import { Activity } from "./activity.service.js";
 
 interface CreateProjectDTO {
   name: string;
@@ -58,6 +59,15 @@ export class ProjectService {
           },
         ],
         { session },
+      );
+
+      await Activity.logActivity(
+        data.workspaceId.toString(),
+        data.userId!,
+        "PROJECT_CREATED",
+        project._id.toString(),
+        "PROJECT",
+        `Project '${project.name}' was created.`,
       );
 
       await session.commitTransaction();
@@ -116,6 +126,7 @@ export class ProjectService {
   static async updateProject(
     projectId: string,
     workspaceId: string,
+    userId: string,
     updateData: UpdateProjectDTO,
   ) {
     const formattedData: any = { ...updateData };
@@ -137,6 +148,15 @@ export class ProjectService {
       );
     }
 
+    await Activity.logActivity(
+      workspaceId,
+      userId,
+      "PROJECT_UPDATED",
+      projectId,
+      "PROJECT",
+      `Project '${updatedProject.name}' was updated.`,
+    );
+
     return updatedProject;
   }
 
@@ -157,6 +177,14 @@ export class ProjectService {
         throw new Error("Project not found or you don't have permission.");
       }
       await ProjectMember.deleteMany({ projectId }, { session });
+      await Activity.logActivity(
+        workspaceId,
+        userId,
+        "PROJECT_DELETED",
+        projectId,
+        "PROJECT",
+        `Project '${project.name}' was deleted.`,
+      );
       await session.commitTransaction();
       return true;
     } catch (error) {

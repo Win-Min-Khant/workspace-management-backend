@@ -5,67 +5,67 @@ import { User } from "../models/user.model.js";
 import { Workspace as WorkspaceModel } from "../models/workspace.model.js";
 import type { Image } from "../types/auth.types.js";
 import { AppError } from "../utils/appError.js";
-import { deleteImage, uploadSingleImage } from "../utils/uploadToCloudinary.js";
+import { deleteImage } from "../utils/uploadToCloudinary.js";
 import { UserWorkspace } from "../models/user_workspace.model.js";
 
 export class Workspace {
   // Create New Workspace
-  static async createWorkspace(
-    name: string,
-    logoPath: string,
-    ownerId: string,
-  ) {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-    try {
-      let uploadedLogo;
-      if (logoPath) {
-        uploadedLogo = (await uploadSingleImage(
-          logoPath,
-          "jira-clone/logo",
-        )) as Image;
-      }
-      const workspace = await WorkspaceModel.create(
-        [
-          {
-            name,
-            logo: {
-              image_url: uploadedLogo?.image_url || "",
-              public_alt: uploadedLogo?.public_alt || "",
-            },
-            ownerId,
-          },
-        ],
-        {
-          session,
-        },
-      );
-      const newWorkspace = workspace[0];
-      if (!newWorkspace || workspace.length === 0)
-        throw new AppError(500, "Workspace creation failed.");
-      const user = await User.findByIdAndUpdate(
-        ownerId,
-        {
-          $push: {
-            workspaceIds: newWorkspace._id,
-          },
-        },
-        { session },
-      );
-      await session.commitTransaction();
-      const accessToken = user!.generateAccessToken();
+  // static async createWorkspace(
+  //   name: string,
+  //   logoPath: string,
+  //   ownerId: string,
+  // ) {
+  //   const session = await mongoose.startSession();
+  //   session.startTransaction();
+  //   try {
+  //     let uploadedLogo;
+  //     if (logoPath) {
+  //       uploadedLogo = (await uploadSingleImage(
+  //         logoPath,
+  //         "jira-clone/logo",
+  //       )) as Image;
+  //     }
+  //     const workspace = await WorkspaceModel.create(
+  //       [
+  //         {
+  //           name,
+  //           logo: {
+  //             image_url: uploadedLogo?.image_url || "",
+  //             public_alt: uploadedLogo?.public_alt || "",
+  //           },
+  //           ownerId,
+  //         },
+  //       ],
+  //       {
+  //         session,
+  //       },
+  //     );
+  //     const newWorkspace = workspace[0];
+  //     if (!newWorkspace || workspace.length === 0)
+  //       throw new AppError(500, "Workspace creation failed.");
+  //     const user = await User.findByIdAndUpdate(
+  //       ownerId,
+  //       {
+  //         $push: {
+  //           workspaceIds: newWorkspace._id,
+  //         },
+  //       },
+  //       { session },
+  //     );
+  //     await session.commitTransaction();
+  //     const accessToken = user!.generateAccessToken();
 
-      return {
-        workspace: workspace[0],
-        accessToken,
-      };
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      session.endSession();
-    }
-  }
+  //     return {
+  //       workspace: workspace[0],
+  //       accessToken,
+  //     };
+  //   } catch (error) {
+  //     await session.abortTransaction();
+  //     throw error;
+  //   } finally {
+  //     session.endSession();
+  //   }
+  // }
   // View Workspace Details
   static async getWorkspaceDetails(workspaceId: string) {
     const [workspace, totalMembers, totalProjects, totalTasks] =
@@ -85,34 +85,34 @@ export class Workspace {
   }
 
   // Update Workspace
-  static async updateWorkspace(
-    workspaceId: string,
-    name: string,
-    logo: string | undefined,
-  ) {
-    const workspace = await WorkspaceModel.findById(workspaceId);
-    if (!workspace) throw new AppError(404, "Workspace not found.");
-    const updateData: { name?: string; cloudLogo?: Image } = {};
-    if (name) updateData.name = name;
-    if (logo) {
-      if (workspace?.logo?.image_url) {
-        await deleteImage(workspace.logo.public_alt);
-      }
-      updateData.cloudLogo = await uploadSingleImage(logo, "jira-clone/logo");
-    }
-    const updatedWorkspace = await WorkspaceModel.findByIdAndUpdate(
-      workspaceId,
-      {
-        $set: {
-          name: updateData.name,
-          logo: updateData.cloudLogo,
-        },
-      },
-      { returnDocument: "after" },
-    );
-    if (!updatedWorkspace) throw new AppError(404, "Workspace not found.");
-    return updatedWorkspace;
-  }
+  // static async updateWorkspace(
+  //   workspaceId: string,
+  //   name: string,
+  //   logo: string | undefined,
+  // ) {
+  //   const workspace = await WorkspaceModel.findById(workspaceId);
+  //   if (!workspace) throw new AppError(404, "Workspace not found.");
+  //   const updateData: { name?: string; cloudLogo?: Image } = {};
+  //   if (name) updateData.name = name;
+  //   if (logo) {
+  //     if (workspace?.logo?.image_url) {
+  //       await deleteImage(workspace.logo.public_alt);
+  //     }
+  //     updateData.cloudLogo = await uploadSingleImage(logo, "jira-clone/logo");
+  //   }
+  //   const updatedWorkspace = await WorkspaceModel.findByIdAndUpdate(
+  //     workspaceId,
+  //     {
+  //       $set: {
+  //         name: updateData.name,
+  //         logo: updateData.cloudLogo,
+  //       },
+  //     },
+  //     { returnDocument: "after" },
+  //   );
+  //   if (!updatedWorkspace) throw new AppError(404, "Workspace not found.");
+  //   return updatedWorkspace;
+  // }
 
   // Delete Workspace
   static async deleteWorkspace(workspaceId: string, userId: string) {

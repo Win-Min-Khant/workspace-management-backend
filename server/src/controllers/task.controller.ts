@@ -88,6 +88,7 @@ export const updateTask = asyncHandler(
 // @access Private (Member)
 export const updateTaskStatus = asyncHandler(
   async (req: AuthRequest, res: Response) => {
+    const workspaceId = req.params.workspaceId;
     const taskId = req.params.taskId;
     const { userId, status } = req.body;
     const statusType = ["todo", "in-progress", "done"];
@@ -98,6 +99,7 @@ export const updateTaskStatus = asyncHandler(
       taskId as string,
       userId as string,
       status,
+      workspaceId as string,
     );
     res.status(200).json({
       success: true,
@@ -113,7 +115,9 @@ export const updateTaskStatus = asyncHandler(
 export const deleteTask = asyncHandler(
   async (req: AuthRequest, res: Response) => {
     const { taskId, workspaceId, projectId } = req.params;
+    const userId = req.user?.userId;
     await TaskService.deleteTask(
+      userId as string,
       taskId as string,
       workspaceId as string,
       projectId as string,
