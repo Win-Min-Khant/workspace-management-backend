@@ -25,6 +25,7 @@ const projectMemberSchema = new Schema<IProjectMember>(
 );
 
 projectMemberSchema.index({ projectId: 1, userId: 1 }, { unique: true });
+projectMemberSchema.index({ userId: 1 });
 
 export const ProjectMember = mongoose.model<IProjectMember>(
   "ProjectMember",

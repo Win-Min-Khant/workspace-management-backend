@@ -11,18 +11,10 @@ import { UserWorkspace } from "../models/user_workspace.model.js";
 export const createProject = asyncHandler(
   async (req: AuthRequest, res: Response) => {
     const { name, description, status, startDate, endDate } = req.body;
-    const workspaceId = String(req.params.workspaceId);
+    const workspaceId = req.params.workspaceId as string;
     const userId = req.user?.userId as string;
-    const membership = await UserWorkspace.findOne({
-      userId,
-      workspaceId,
-    });
-    if (!membership) {
-      throw new AppError(403, "You are not a member of this workspace.");
-    }
-    if (membership.role === "member") {
-      throw new AppError(403, "Only Owner or Admin can create a project.");
-    }
+    if (!userId) throw new AppError(401, "Unauthorized.");
+    if (!name) throw new AppError(400, "Project name is required.");
     const result = await ProjectService.createProject({
       name,
       description,
@@ -32,6 +24,7 @@ export const createProject = asyncHandler(
       userId,
       workspaceId,
     });
+
     res.status(201).json({
       success: true,
       message: `${name} is created successfully.`,
@@ -72,42 +65,31 @@ export const createProject = asyncHandler(
 // @desc PATCH Update an existing project
 // @access Private (Owner/Admin)
 export const updateProject = asyncHandler(async (req: any, res: Response) => {
-  const { projectId } = req.params;
-  const { workspaceId } = req.params;
-  const userId = req.user.userId;
-
-  const membership = await UserWorkspace.findOne({ userId, workspaceId });
-  if (!membership || membership.role === "member") {
-    throw new AppError(
-      403,
-      "Access denied: Only Owner/Admin can update project.",
-    );
-  }
+  const { projectId, workspaceId } = req.params;
+  const userId = req.user.userId as string;
+  if (!userId) throw new AppError(401, "Unauthorized.");
+  const { name, description, status, startDate, endDate } = req.body;
 
   const updatedProject = await ProjectService.updateProject(
     projectId,
     workspaceId,
     userId,
-    req.body,
+    { name, description, status, startDate, endDate },
   );
 
   res.status(200).json({
     success: true,
+    message: "Project updated successfully.",
     data: updatedProject,
   });
 });
 
 // @route DELETE | api/workspace/:workspaceId/projects/:projectId
 // @desc DELETE Delete an existing project
-// @access Private (Owner)
+// @access Private (Owner/Admin)
 export const deleteProject = asyncHandler(async (req: any, res: Response) => {
   const { projectId, workspaceId } = req.params;
   const userId = req.user.userId;
-
-  const membership = await UserWorkspace.findOne({ userId, workspaceId });
-  if (!membership || membership.role !== "owner") {
-    throw new AppError(403, "Access denied: Only Owner can delete a project.");
-  }
 
   await ProjectService.deleteProject(projectId, workspaceId, userId);
 
@@ -117,52 +99,55 @@ export const deleteProject = asyncHandler(async (req: any, res: Response) => {
   });
 });
 
+// @route POST | api/workspace/:workspaceId/projects/:projectId/members
+// @desc POST Add or remove a member from a project
+// @access Private (Owner/Admin)
 export const manageMember = asyncHandler(
   async (req: AuthRequest, res: Response) => {
     const { workspaceId, projectId } = req.params;
     const { userIdToAssign, action } = req.body;
     // console.log(`userIdToAssign - ${userIdToAssign} and action - ${action}`);
-    const isWorkspaceMember = await UserWorkspace.findOne({
-      workspaceId: String(workspaceId),
-      userId: userIdToAssign,
-    });
-    if (!isWorkspaceMember) {
-      throw new AppError(400, "User is not a member of this workspace.");
+    if (!userIdToAssign) throw new AppError(400, "userIdToAssign is required.");
+    if (!action || !["add", "remove"].includes(action)) {
+      throw new AppError(400, "Action must be add or remove.");
     }
     await ProjectService.manageMember(
       projectId as string,
-      userIdToAssign as string,
+      userIdToAssign,
+      workspaceId as string,
       action,
     );
     res.status(200).json({
       success: true,
-      message: `Member ${action === "add" ? "added to" : "removed from"} project.`,
+      message: `Member ${action === "add" ? "added to" : "removed from"} project successfully.`,
     });
   },
 );
 
+// @route GET | api/workspace/:workspaceId/projects
+// @desc GET View all projects in workspace
+// @access Private (Owner/Admin/Member)
 export const getProjects = asyncHandler(
   async (req: AuthRequest, res: Response) => {
-    const { workspaceId } = req.params;
+    const workspaceId: string = req.params.workspaceId as string;
     const { search, status } = req.query;
-    const userId = req.user?.userId;
+
+    const userId: string = req.user?.userId as string;
     const membership = await UserWorkspace.findOne({
-      userId: String(userId),
-      workspaceId: String(workspaceId),
+      userId: userId,
+      workspaceId,
     });
     if (!membership) {
-      throw new AppError(404, "User not found in this workspace.");
+      throw new AppError(403, "You are not a member of this workspace.");
     }
 
-    const role = membership.role;
-
-    const projects = await ProjectService.getProjects(
-      workspaceId as string,
-      userId as string,
-      role,
-      search as string,
-      status as string,
-    );
+    const projects = await ProjectService.getProjects({
+      workspaceId,
+      userId,
+      role: membership.role,
+      search: search as string,
+      status: status as string,
+    });
 
     res.status(200).json({ success: true, data: projects });
   },

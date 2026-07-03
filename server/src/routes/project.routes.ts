@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { protect, isOwnerOrAdmin } from "../middlewares/protect.middleware.js";
+import { protect, requireRole } from "../middlewares/protect.middleware.js";
 import {
   createProject,
   getProjects,
@@ -12,12 +12,14 @@ const router = Router({ mergeParams: true });
 
 router
   .route("/")
-  .post(protect, isOwnerOrAdmin, createProject)
+  .post(protect, requireRole("owner", "admin"), createProject)
   .get(protect, getProjects);
 router
   .route("/:projectId")
-  .patch(protect, isOwnerOrAdmin, updateProject)
-  .delete(protect, isOwnerOrAdmin, deleteProject);
-router.route("/:projectId/members").post(protect, isOwnerOrAdmin, manageMember);
+  .patch(protect, requireRole("owner", "admin"), updateProject)
+  .delete(protect, requireRole("owner", "admin"), deleteProject);
+router
+  .route("/:projectId/members")
+  .post(protect, requireRole("owner", "admin"), manageMember);
 
 export default router;

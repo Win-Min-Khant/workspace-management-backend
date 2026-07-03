@@ -66,7 +66,12 @@ export const logout = asyncHandler(async (req: AuthRequest, res: Response) => {
 // @access Private
 export const getProfile = asyncHandler(
   async (req: AuthRequest, res: Response) => {
-    const profile = await AuthService.getProfile(req.user?.userId as string);
+    const { workspaceId } = req.params;
+    const userId = req.user?.userId;
+    const profile = await AuthService.getProfile(
+      workspaceId as string,
+      userId as string,
+    );
     res.status(200).json({
       success: true,
       data: profile,
@@ -77,33 +82,31 @@ export const getProfile = asyncHandler(
 // @route PUT | api/auth/profile
 // @desc Update Name
 // @access Private
-export const updateName = asyncHandler(
+export const updateProfile = asyncHandler(
   async (req: AuthRequest, res: Response) => {
     const { name } = req.body;
-    const result = await AuthService.updateName(
-      req.user?.userId as string,
-      name,
-    );
-    res.status(200).json({
-      success: true,
-      data: result,
-    });
+    const userId = req.user?.userId as string;
+
+    if (!userId) throw new AppError(401, "Unauthorized.");
+
+    const result = await AuthService.updateProfile(userId, name);
+
+    res.status(200).json({ success: true, data: result });
   },
 );
 
 // @route POST | api/auth/upload
 // @desc upload or update user's avatar
 // @access Private
-// export const uploadAvatar = asyncHandler(
-//   async (req: AuthRequest, res: Response) => {
-//     const { image_url } = req.body;
-//     const result = await AuthService.uploadAvatar(
-//       req.user?.userId as string,
-//       image_url,
-//     );
-//     res.status(200).json({
-//       success: true,
-//       data: result,
-//     });
-//   },
-// );
+export const uploadAvatar = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    const userId = req.user?.userId as string;
+
+    if (!userId) throw new AppError(401, "Unauthorized.");
+    if (!req.file) throw new AppError(400, "Avatar file is required.");
+
+    const result = await AuthService.updateAvatar(userId, req.file);
+
+    res.status(200).json({ success: true, data: result });
+  },
+);

@@ -12,6 +12,7 @@ import taskRoutes from "./routes/task.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
 import commentRoutes from "./routes/comment.routes.js";
 import activityRoutes from "./routes/activity.routes.js";
+import notificationRoutes from "./routes/notification.routes.js";
 
 // dotenv config
 dotenv.config({
@@ -23,6 +24,7 @@ const app = express();
 
 // middlewares
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(
   cors({
     origin: process.env.CLIENT_URL,
@@ -33,20 +35,22 @@ app.use(cookieParser());
 
 // routes
 app.use("/api/auth", authRoutes);
-app.use("/api/workspace", workspaceRoutes);
+app.use("/api/workspaces", workspaceRoutes);
 app.use("/api/invitation", inviteRoutes);
 app.use("/api/workspaces/:workspaceId/projects", projectRoutes);
-app.use("/api/workspaces/:workspaceId/tasks", taskRoutes);
+app.use("/api/workspaces/:workspaceId/projects/:projectId/tasks", taskRoutes);
 app.use("/api/workspaces/:workspaceId/dashboard", dashboardRoutes);
 app.use("/api/workspaces/:workspaceId/tasks/:taskId/comments", commentRoutes);
 app.use("/api/workspaces/:workspaceId/activity", activityRoutes);
+app.use("/api/workspaces/:workspaceId/notifications", notificationRoutes);
 
-// debug route list
 // custom middlewares
 app.use(errorHandler);
 
+const PORT = process.env.PORT || 5000;
+
 // connect server with database
-app.listen(process.env.PORT, () => {
+app.listen(PORT, () => {
   connectDB();
   console.log(`Server is running on port ${process.env.PORT}`);
 });

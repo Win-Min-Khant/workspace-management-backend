@@ -6,6 +6,7 @@ export interface IProject extends Document {
   description: string;
   status: "planning" | "active" | "completed";
   workspaceId: Types.ObjectId;
+  createdBy: Types.ObjectId;
   startDate?: Date;
   endDate?: Date;
 }
@@ -27,6 +28,11 @@ const projectSchema = new mongoose.Schema<IProject>(
       ref: "Workspace",
       required: true,
       index: true,
+    },
+    createdBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
     },
     startDate: {
       type: Date,

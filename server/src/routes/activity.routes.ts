@@ -1,6 +1,11 @@
 import { Router } from "express";
-import { protect } from "../middlewares/protect.middleware.js";
+import { protect, requireRole } from "../middlewares/protect.middleware.js";
 import { getActivityLogs } from "../controllers/activity.controller.js";
 const router = Router({ mergeParams: true });
-router.get("/", protect, getActivityLogs);
+router.get(
+  "/:workspaceId/activities",
+  protect,
+  requireRole("owner", "admin"),
+  getActivityLogs,
+);
 export default router;

@@ -3,68 +3,103 @@ import { Project } from "../models/project.model.js";
 import { ProjectMember } from "../models/project_member.model.js";
 import { Task } from "../models/task.model.js";
 import { UserWorkspace } from "../models/user_workspace.model.js";
-import { AppError } from "../utils/appError.js";
+
+const getCount = (arr: { count: number }[]) => arr[0]?.count ?? 0;
 
 export class DashboardService {
-  // Owner/Admin Dashboard
   static async getOwnerDashboard(workspaceId: string) {
-    const result = await Task.aggregate([
-      { $match: { workspaceId: new mongoose.Types.ObjectId(workspaceId) } },
-      {
-        $facet: {
-          total: [{ $count: "count" }],
-          completed: [{ $match: { status: "done" } }, { $count: "count" }],
-          pending: [
-            { $match: { status: { $in: ["todo", "in-progress"] } } },
-            { $count: "count" },
-          ],
-          overdue: [
-            {
-              $match: { dueDate: { $lt: new Date() }, status: { $ne: "done" } },
-            },
-            { $count: "count" },
-          ],
+    const workspaceObjectId = new mongoose.Types.ObjectId(workspaceId);
+
+    const [taskStats, totalProjects, totalMembers] = await Promise.all([
+      Task.aggregate([
+        { $match: { workspaceId: workspaceObjectId } },
+        {
+          $facet: {
+            total: [{ $count: "count" }],
+            completed: [{ $match: { status: "done" } }, { $count: "count" }],
+            pending: [
+              { $match: { status: { $in: ["todo", "in-progress"] } } },
+              { $count: "count" },
+            ],
+            overdue: [
+              {
+                $match: {
+                  dueDate: { $lt: new Date() },
+                  status: { $ne: "done" },
+                },
+              },
+              { $count: "count" },
+            ],
+          },
         },
-      },
+      ]),
+      Project.countDocuments({ workspaceId }),
+      UserWorkspace.countDocuments({ workspaceId }),
     ]);
 
-    // Extract the first element (the only one from $facet)
-    const raw = result[0];
-
-    // Helper to safely get the count from the [{count: X}] format
-    const getCount = (arr: any[]) => (arr.length > 0 ? arr[0].count : 0);
+    const raw = taskStats[0];
 
     return {
-      stats: {
+      totalMembers,
+      totalProjects,
+      tasks: {
         total: getCount(raw.total),
         completed: getCount(raw.completed),
         pending: getCount(raw.pending),
         overdue: getCount(raw.overdue),
       },
-      totalProjects: await Project.countDocuments({ workspaceId }),
-      totalMembers: await UserWorkspace.countDocuments({ workspaceId }),
     };
   }
 
   static async getMemberDashboard(workspaceId: string, userId: string) {
-    const memberProjectMemberships = await ProjectMember.find({ userId });
-    const projectIds = memberProjectMemberships.map((m) => m.projectId);
+    const workspaceObjectId = new mongoose.Types.ObjectId(workspaceId);
+    const userObjectId = new mongoose.Types.ObjectId(userId);
 
-    const assignedProjects = await Project.find({
-      _id: { $in: projectIds },
-      workspaceId: workspaceId,
+    const workspaceProjects = await Project.find({ workspaceId }, "_id");
+    const workspaceProjectIds = workspaceProjects.map((p) => p._id);
+
+    const memberProjectIds = await ProjectMember.distinct("projectId", {
+      userId,
+      projectId: { $in: workspaceProjectIds },
     });
 
-    const assignedTasks = await Task.find({ workspaceId, assigneeId: userId })
-      .populate("projectId", "name")
-      .sort({ createdAt: -1 });
+    const [assignedProjects, taskStats] = await Promise.all([
+      Project.find({
+        _id: { $in: memberProjectIds },
+        workspaceId,
+      }).select("name status startDate endDate"),
+
+      Task.aggregate([
+        {
+          $match: {
+            workspaceId: workspaceObjectId,
+            assigneeId: userObjectId,
+          },
+        },
+        {
+          $facet: {
+            total: [{ $count: "count" }],
+            completed: [{ $match: { status: "done" } }, { $count: "count" }],
+            pending: [
+              { $match: { status: { $in: ["todo", "in-progress"] } } },
+              { $count: "count" },
+            ],
+          },
+        },
+      ]),
+    ]);
+
+    const raw = taskStats[0];
 
     return {
-      assignedProjects,
-      assignedTasks: {
-        all: assignedTasks,
-        completed: assignedTasks.filter((t) => t.status === "done"),
-        pending: assignedTasks.filter((t) => t.status !== "done"),
+      assignedProjects: {
+        count: assignedProjects.length,
+        projects: assignedProjects,
+      },
+      tasks: {
+        total: getCount(raw.total),
+        completed: getCount(raw.completed),
+        pending: getCount(raw.pending),
       },
     };
   }

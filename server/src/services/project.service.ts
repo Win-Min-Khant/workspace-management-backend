@@ -1,9 +1,13 @@
 import mongoose from "mongoose";
-import { UserWorkspace } from "../models/user_workspace.model.js";
-import { AppError } from "../utils/appError.js";
 import { ProjectMember } from "../models/project_member.model.js";
 import { Project, type IProject } from "../models/project.model.js";
 import { Activity } from "./activity.service.js";
+import { AppError } from "../utils/appError.js";
+import { UserWorkspace } from "../models/user_workspace.model.js";
+import { Task } from "../models/task.model.js";
+import { Invitation } from "../models/invitation.model.js";
+import { Comment } from "../models/comment.model.js";
+import { Notification } from "../models/notification.model.js";
 
 interface CreateProjectDTO {
   name: string;
@@ -15,10 +19,12 @@ interface CreateProjectDTO {
   userId?: string;
 }
 
-interface ViewProjectDTO {
-  userId: string;
+interface GetProjectsDTO {
   workspaceId: string;
-  role: "owner" | "admin" | "member";
+  userId: string;
+  role: string;
+  search?: string;
+  status?: string;
 }
 
 interface UpdateProjectDTO {
@@ -44,23 +50,26 @@ export class ProjectService {
             startDate: data.startDate ? new Date(data.startDate) : undefined,
             endDate: data.endDate ? new Date(data.endDate) : undefined,
             workspaceId: data.workspaceId,
+            createdBy: data.userId,
           } as CreateProjectDTO,
         ],
         { session },
       );
 
       const project = projects[0] as IProject;
+      if (!project) throw new AppError(500, "Project creation failed.");
 
       await ProjectMember.create(
         [
           {
-            projectId: new mongoose.Types.ObjectId(project._id),
-            userId: new mongoose.Types.ObjectId(data.userId),
+            projectId: project._id,
+            userId: new mongoose.Types.ObjectId(data.userId as string),
           },
         ],
         { session },
       );
 
+      await session.commitTransaction();
       await Activity.logActivity(
         data.workspaceId.toString(),
         data.userId!,
@@ -69,57 +78,44 @@ export class ProjectService {
         "PROJECT",
         `Project '${project.name}' was created.`,
       );
-
-      await session.commitTransaction();
       return project;
     } catch (error) {
-      await session.abortTransaction();
+      if (session.inTransaction()) await session.abortTransaction();
       throw error;
     } finally {
       session.endSession();
     }
   }
 
-  // view project
-  // static async getProjects(data: ViewProjectDTO) {
-  //   const { userId, workspaceId, role } = data;
-  //   if (role === "owner" || role === "admin") {
-  //     const projects = await Project.find({ workspaceId });
-  //     return projects;
-  //   } else {
-  //     const projectIds = await ProjectMember.distinct("projectId", { userId });
-
-  //     return await Project.find({
-  //       workspaceId,
-  //       _id: { $in: projectIds },
-  //     }).select("_id");
-  //   }
-  // }
-
   // search and filter of projects
-  static async getProjects(
-    workspaceId: string,
-    userId: string,
-    role: string,
-    search?: string,
-    status?: string,
-  ) {
+  static async getProjects(data: GetProjectsDTO) {
+    const { workspaceId, userId, role, search, status } = data;
     const query: any = { workspaceId };
-
     if (role !== "owner" && role !== "admin") {
-      const projectsOfMember = await ProjectMember.find({ userId });
-      query._id = { $in: projectsOfMember.map((m) => m.projectId) };
+      const projectIds = await ProjectMember.distinct("projectId", { userId });
+      query._id = { $in: projectIds };
     }
 
     if (search) {
       query.name = { $regex: search, $options: "i" };
     }
 
+    const validStatuses = ["planning", "active", "completed"];
+    if (status && !validStatuses.includes(status)) {
+      throw new AppError(
+        400,
+        `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
+      );
+    }
+
     if (status) {
       query.status = status;
     }
 
-    return await Project.find(query);
+    const projects = await Project.find(query)
+      .populate("createdBy", "name email avatar")
+      .sort({ createdAt: -1 });
+    return projects;
   }
 
   // update project
@@ -129,12 +125,27 @@ export class ProjectService {
     userId: string,
     updateData: UpdateProjectDTO,
   ) {
-    const formattedData: any = { ...updateData };
+    const formattedData: Partial<{
+      name: string;
+      description: string;
+      status: string;
+      startDate: Date;
+      endDate: Date;
+    }> = {};
 
-    if (updateData.startDate)
+    if (updateData.name !== undefined) formattedData.name = updateData.name;
+    if (updateData.description !== undefined)
+      formattedData.description = updateData.description;
+    if (updateData.status !== undefined)
+      formattedData.status = updateData.status;
+    if (updateData.startDate !== undefined)
       formattedData.startDate = new Date(updateData.startDate);
-    if (updateData.endDate)
+    if (updateData.endDate !== undefined)
       formattedData.endDate = new Date(updateData.endDate);
+
+    if (Object.keys(formattedData).length === 0) {
+      throw new AppError(400, "No update data provided.");
+    }
 
     const updatedProject = await Project.findOneAndUpdate(
       { _id: projectId, workspaceId },
@@ -143,7 +154,8 @@ export class ProjectService {
     );
 
     if (!updatedProject) {
-      throw new Error(
+      throw new AppError(
+        404,
         "Project not found or does not belong to this workspace.",
       );
     }
@@ -155,7 +167,7 @@ export class ProjectService {
       projectId,
       "PROJECT",
       `Project '${updatedProject.name}' was updated.`,
-    );
+    ).catch((err) => console.error("Activity log failed: " + err));
 
     return updatedProject;
   }
@@ -166,52 +178,117 @@ export class ProjectService {
     workspaceId: string,
     userId: string,
   ) {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-    try {
-      const project = await Project.findOneAndDelete({
-        _id: projectId,
-        workspaceId,
-      });
-      if (!project) {
-        throw new Error("Project not found or you don't have permission.");
-      }
-      await ProjectMember.deleteMany({ projectId }, { session });
-      await Activity.logActivity(
-        workspaceId,
-        userId,
-        "PROJECT_DELETED",
-        projectId,
-        "PROJECT",
-        `Project '${project.name}' was deleted.`,
+    const project = await Project.findOne({ _id: projectId, workspaceId });
+    if (!project)
+      throw new AppError(
+        404,
+        "Project not found or you don't have permission.",
       );
-      await session.commitTransaction();
-      return true;
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      session.endSession();
+
+    const taskIds = await Task.distinct("_id", { projectId });
+
+    await Project.findByIdAndDelete(projectId);
+    await ProjectMember.deleteMany({ projectId });
+    await Task.deleteMany({ projectId });
+    await Notification.deleteMany({ taskId: { $in: taskIds } });
+
+    if (taskIds.length > 0) {
+      await Comment.deleteMany({ taskId: { $in: taskIds } });
     }
+
+    await Activity.logActivity(
+      workspaceId,
+      userId,
+      "PROJECT_DELETED",
+      projectId,
+      "PROJECT",
+      `Project ${project.name} was deleted.`,
+    ).catch((err) => console.error("Activity log failed:", err));
+
+    return { message: "Project deleted successfully." };
   }
 
-  // assign members to project
+  // static async deleteProject(
+  //   projectId: string,
+  //   workspaceId: string,
+  //   userId: string,
+  // ) {
+  //   const project = await Project.findOne({ _id: projectId, workspaceId });
+  //   if (!project)
+  //     throw new AppError(
+  //       404,
+  //       "Project not found or you don't have permission.",
+  //     );
+
+  //   const session = await mongoose.startSession();
+
+  //   try {
+  //     session.startTransaction();
+
+  //     const taskIds = await Task.distinct("_id", { projectId });
+
+  //     await Promise.all([
+  //       Project.findByIdAndDelete(projectId, { session }),
+  //       ProjectMember.deleteMany({ projectId }, { session }),
+  //       Task.deleteMany({ projectId }, { session }),
+  //       await Comment.deleteMany({ taskId: { $in: taskIds } }),
+  //     ]);
+
+  //     await session.commitTransaction();
+
+  //     await Activity.logActivity(
+  //       workspaceId,
+  //       userId,
+  //       "PROJECT_DELETED",
+  //       projectId,
+  //       "PROJECT",
+  //       `Project ${project.name} was deleted.`,
+  //     ).catch((err) => console.error("Activity log failed:", err));
+
+  //     return { message: "Project deleted successfully." };
+  //   } catch (error) {
+  //     if (session.inTransaction()) await session.abortTransaction();
+  //     throw error;
+  //   } finally {
+  //     await session.endSession();
+  //   }
+  // }
+
+  // assign or delete members to project
   static async manageMember(
     projectId: string,
     userIdToAssign: string,
+    workspaceId: string,
     action: "add" | "remove",
   ) {
+    const project = await Project.findOne({ workspaceId, _id: projectId });
+    if (!project) throw new AppError(404, "Project not found.");
     if (action === "add") {
-      return await ProjectMember.findOneAndUpdate(
-        { projectId, userId: userIdToAssign },
-        { projectId, userId: userIdToAssign },
-        { upsert: true, returnDocument: "after" },
-      );
-    } else {
-      return await ProjectMember.findOneAndDelete({
+      const isMember = await UserWorkspace.findOne({
+        workspaceId,
+        userId: userIdToAssign,
+      });
+      if (!isMember)
+        throw new AppError(400, "User does not belong to this workspace.");
+      const existingMember = await ProjectMember.findOne({
         projectId,
         userId: userIdToAssign,
       });
+      if (existingMember)
+        throw new AppError(400, "User is already assigned to this project.");
+      const newProjectMember = await ProjectMember.create({
+        projectId,
+        userId: userIdToAssign,
+      });
+      return newProjectMember;
+    } else {
+      const removedMember = await ProjectMember.findOneAndDelete({
+        projectId,
+        userId: userIdToAssign,
+      });
+      if (!removedMember)
+        throw new AppError(404, "Member not found in this project.");
+      return { message: "Member removed successfully." };
     }
   }
 }

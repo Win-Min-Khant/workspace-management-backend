@@ -7,7 +7,8 @@ import { AppError } from "../utils/appError.js";
 
 export const validateMember = async (userId: string, workspaceId: string) => {
   const isMember = await UserWorkspace.findOne({ userId, workspaceId });
-  if (!isMember) throw new Error("User is not a member of this workspace.");
+  if (!isMember)
+    throw new AppError(400, "Assignee is not a member of this workspace.");
 };
 
 // @route POST | api/workspace/:workspaceId/projects/:projectId/tasks/
@@ -15,14 +16,16 @@ export const validateMember = async (userId: string, workspaceId: string) => {
 // @access Private (Owner/Admin)
 export const createTask = asyncHandler(
   async (req: AuthRequest, res: Response) => {
-    const { workspaceId } = req.params;
-    const assignedBy = req.user?.userId;
+    const { workspaceId, projectId } = req.params;
+    const assignedBy = req.user?.userId as string;
+    if (!assignedBy) throw new AppError(401, "Unauthorized.");
     if (req.body.assigneeId) {
       await validateMember(req.body.assigneeId, String(workspaceId));
     }
     const task = await TaskService.createTask({
       ...req.body,
       workspaceId,
+      projectId,
       assignedBy,
     });
     res.status(201).json({ success: true, data: task });
@@ -43,28 +46,37 @@ export const createTask = asyncHandler(
 //     res.status(200).json({ success: true, count: tasks.length, tasks });
 //   },
 // );
+
+// @route GET | api/workspaces/:workspaceId/projects/:projectId/tasks
+// @desc Get tasks with search and filter
+// @access Private (Owner/Admin/Member)
 export const getTasksByQuery = asyncHandler(
   async (req: AuthRequest, res: Response) => {
-    const { workspaceId } = req.params;
-    const userId = req.user?.userId;
+    const { workspaceId, projectId } = req.params;
+    const userId = req.user?.userId as string;
     const { search, status, priority, assigneeId } = req.query;
+
+    if (!userId) throw new AppError(401, "Unauthorized.");
+
     const membership = await UserWorkspace.findOne({
       userId: String(userId),
       workspaceId: String(workspaceId),
     });
     if (!membership)
-      throw new AppError(404, "User not found in this workspace.");
-    const role = membership.role;
+      throw new AppError(403, "You are not a member of this workspace.");
+
     const tasks = await TaskService.getTasksByQuery(
       workspaceId as string,
-      userId as string,
-      role as string,
-      search as string,
-      status as string,
-      priority as string,
-      assigneeId as string,
+      userId,
+      membership.role,
+      projectId as string | undefined,
+      search as string | undefined,
+      status as string | undefined,
+      priority as string | undefined,
+      assigneeId as string | undefined,
     );
-    res.status(200).json({ success: true, data: tasks });
+
+    res.status(200).json({ success: true, count: tasks.length, data: tasks });
   },
 );
 
@@ -73,11 +85,19 @@ export const getTasksByQuery = asyncHandler(
 // @access Private (Owner/Admin)
 export const updateTask = asyncHandler(
   async (req: AuthRequest, res: Response) => {
-    const { taskId } = req.params;
-    const result = await TaskService.updateTask(taskId as string, req.body);
+    const { workspaceId, projectId, taskId } = req.params;
+    const { title, description, status, priority, assigneeId, dueDate } =
+      req.body;
+    const result = await TaskService.updateTask(
+      taskId as string,
+      workspaceId as string,
+      projectId as string,
+      { title, description, status, priority, assigneeId, dueDate },
+    );
+
     res.status(200).json({
       success: true,
-      message: "Task is updated successfully.",
+      message: "Task updated successfully.",
       data: result,
     });
   },
@@ -88,22 +108,29 @@ export const updateTask = asyncHandler(
 // @access Private (Member)
 export const updateTaskStatus = asyncHandler(
   async (req: AuthRequest, res: Response) => {
-    const workspaceId = req.params.workspaceId;
-    const taskId = req.params.taskId;
-    const { userId, status } = req.body;
-    const statusType = ["todo", "in-progress", "done"];
-    if (!statusType.includes(status)) {
-      return res.status(400).json({ message: "Invalid status" });
+    const { workspaceId, projectId, taskId } = req.params;
+    const userId = req.user?.userId as string; // from token, not req.body
+    const { status } = req.body;
+
+    if (!userId) throw new AppError(401, "Unauthorized.");
+    const validStatuses = ["todo", "in-progress", "done"];
+    if (!status || !validStatuses.includes(status)) {
+      throw new AppError(
+        400,
+        `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
+      );
     }
     const result = await TaskService.updateTaskStatus(
       taskId as string,
-      userId as string,
-      status,
+      userId,
       workspaceId as string,
+      projectId as string,
+      { status },
     );
+
     res.status(200).json({
       success: true,
-      message: "Task status is updated successfully.",
+      message: "Task status updated successfully.",
       data: result,
     });
   },
@@ -115,9 +142,11 @@ export const updateTaskStatus = asyncHandler(
 export const deleteTask = asyncHandler(
   async (req: AuthRequest, res: Response) => {
     const { taskId, workspaceId, projectId } = req.params;
-    const userId = req.user?.userId;
+    const userId = req.user?.userId as string;
+    if (!userId) throw new AppError(401, "Unauthorized.");
+
     await TaskService.deleteTask(
-      userId as string,
+      userId,
       taskId as string,
       workspaceId as string,
       projectId as string,

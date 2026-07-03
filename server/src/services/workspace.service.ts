@@ -1,175 +1,182 @@
 import mongoose from "mongoose";
 import { Project } from "../models/project.model.js";
 import { Task } from "../models/task.model.js";
-import { User } from "../models/user.model.js";
 import { Workspace as WorkspaceModel } from "../models/workspace.model.js";
 import type { Image } from "../types/auth.types.js";
 import { AppError } from "../utils/appError.js";
-import { deleteImage } from "../utils/uploadToCloudinary.js";
+import {
+  deleteImage,
+  uploadToCloudinary,
+} from "../utils/uploadToCloudinary.js";
 import { UserWorkspace } from "../models/user_workspace.model.js";
+import type { CloudImage } from "./auth.service.js";
+import { ProjectMember } from "../models/project_member.model.js";
+import { Invitation } from "../models/invitation.model.js";
+import { Comment } from "../models/comment.model.js";
+import { Notification } from "../models/notification.model.js";
 
 export class Workspace {
-  // Create New Workspace
-  // static async createWorkspace(
-  //   name: string,
-  //   logoPath: string,
-  //   ownerId: string,
-  // ) {
-  //   const session = await mongoose.startSession();
-  //   session.startTransaction();
-  //   try {
-  //     let uploadedLogo;
-  //     if (logoPath) {
-  //       uploadedLogo = (await uploadSingleImage(
-  //         logoPath,
-  //         "jira-clone/logo",
-  //       )) as Image;
-  //     }
-  //     const workspace = await WorkspaceModel.create(
-  //       [
-  //         {
-  //           name,
-  //           logo: {
-  //             image_url: uploadedLogo?.image_url || "",
-  //             public_alt: uploadedLogo?.public_alt || "",
-  //           },
-  //           ownerId,
-  //         },
-  //       ],
-  //       {
-  //         session,
-  //       },
-  //     );
-  //     const newWorkspace = workspace[0];
-  //     if (!newWorkspace || workspace.length === 0)
-  //       throw new AppError(500, "Workspace creation failed.");
-  //     const user = await User.findByIdAndUpdate(
-  //       ownerId,
-  //       {
-  //         $push: {
-  //           workspaceIds: newWorkspace._id,
-  //         },
-  //       },
-  //       { session },
-  //     );
-  //     await session.commitTransaction();
-  //     const accessToken = user!.generateAccessToken();
-
-  //     return {
-  //       workspace: workspace[0],
-  //       accessToken,
-  //     };
-  //   } catch (error) {
-  //     await session.abortTransaction();
-  //     throw error;
-  //   } finally {
-  //     session.endSession();
-  //   }
-  // }
-  // View Workspace Details
+  // US-006 — View Workspace Details
   static async getWorkspaceDetails(workspaceId: string) {
     const [workspace, totalMembers, totalProjects, totalTasks] =
       await Promise.all([
         WorkspaceModel.findById(workspaceId).select("name logo"),
-        User.countDocuments({ workspaceId }),
+        UserWorkspace.countDocuments({ workspaceId }),
         Project.countDocuments({ workspaceId }),
         Task.countDocuments({ workspaceId }),
       ]);
+
+    if (!workspace) throw new AppError(404, "Workspace not found.");
+
     return {
-      workspaceName: workspace?.name,
-      workspaceLogo: workspace?.logo,
+      workspace,
       totalMembers,
       totalProjects,
       totalTasks,
     };
   }
 
-  // Update Workspace
-  // static async updateWorkspace(
-  //   workspaceId: string,
-  //   name: string,
-  //   logo: string | undefined,
-  // ) {
-  //   const workspace = await WorkspaceModel.findById(workspaceId);
-  //   if (!workspace) throw new AppError(404, "Workspace not found.");
-  //   const updateData: { name?: string; cloudLogo?: Image } = {};
-  //   if (name) updateData.name = name;
-  //   if (logo) {
-  //     if (workspace?.logo?.image_url) {
-  //       await deleteImage(workspace.logo.public_alt);
-  //     }
-  //     updateData.cloudLogo = await uploadSingleImage(logo, "jira-clone/logo");
-  //   }
-  //   const updatedWorkspace = await WorkspaceModel.findByIdAndUpdate(
-  //     workspaceId,
-  //     {
-  //       $set: {
-  //         name: updateData.name,
-  //         logo: updateData.cloudLogo,
-  //       },
-  //     },
-  //     { returnDocument: "after" },
-  //   );
-  //   if (!updatedWorkspace) throw new AppError(404, "Workspace not found.");
-  //   return updatedWorkspace;
-  // }
+  // Create Workspace
+  static async createWorkspace(
+    name: string,
+    ownerId: string,
+    logoFile?: Express.Multer.File,
+  ) {
+    let logo: Image | undefined;
 
-  // Delete Workspace
-  static async deleteWorkspace(workspaceId: string, userId: string) {
+    if (logoFile) {
+      const uploadResult = (await uploadToCloudinary(
+        logoFile.buffer,
+        "workspaces/logos",
+      )) as CloudImage;
+      logo = {
+        image_url: uploadResult.secure_url,
+        public_id: uploadResult.public_id,
+      };
+    }
+
     const session = await mongoose.startSession();
     session.startTransaction();
-    try {
-      const workspace =
-        await WorkspaceModel.findById(workspaceId).session(session);
-      if (!workspace) throw new AppError(404, "Workspace not found.");
-      if (workspace.ownerId.toString() !== userId.toString()) {
-        throw new AppError(403, "Only the owner can delete the workspace.");
-      }
 
-      await User.updateMany(
-        { workspaceIds: workspaceId },
-        { $pull: { workspaceIds: workspaceId } },
+    try {
+      const workspace = await WorkspaceModel.create(
+        [{ name, ...(logo && { logo }) }],
+        { session },
+      );
+      const newWorkspace = workspace[0];
+      if (!newWorkspace) throw new AppError(500, "Workspace creation failed.");
+
+      await UserWorkspace.create(
+        [{ userId: ownerId, workspaceId: newWorkspace._id, role: "owner" }],
         { session },
       );
 
-      await Project.deleteMany({ workspaceId }, { session });
-      await Task.deleteMany({ workspaceId }, { session });
-      await WorkspaceModel.findByIdAndDelete(workspaceId, { session });
-
       await session.commitTransaction();
-      return { message: "Workspace deleted successfully." };
+      return { workspace: newWorkspace };
     } catch (error) {
-      await session.abortTransaction();
+      if (session.inTransaction()) await session.abortTransaction();
+      if (logo?.public_id) {
+        await deleteImage(logo.public_id).catch((err) => {
+          console.error("Logo cleanup failed:", err);
+        });
+      }
       throw error;
     } finally {
-      session.endSession();
+      await session.endSession();
     }
   }
 
-  // Switch Workspace
-  // static async switchWorkspace(userId: string, newWorkspaceId: string) {
-  //   const user = await User.findById(userId);
-  //   if (!user) throw new AppError(404, "User not found.");
-  //   if (!user.workspaceIds.includes(newWorkspaceId as any)) {
-  //     throw new AppError(403, "You do not have access to this workspace.");
-  //   }
-  //   user.lastAccessedWorkspaceId = newWorkspaceId as any;
-  //   await user.save({ validateBeforeSave: false });
+  // US-007 — Update Workspace
+  static async updateWorkspace(
+    workspaceId: string,
+    name?: string,
+    logoFile?: Express.Multer.File,
+  ) {
+    const workspace = await WorkspaceModel.findById(workspaceId);
+    if (!workspace) throw new AppError(404, "Workspace not found.");
 
-  //   const accessToken = user.generateAccessToken(newWorkspaceId as string);
-  //   return { accessToken };
-  // }
+    const updateData: { name?: string; logo?: Image } = {};
 
-  // view members in the workspace
+    if (name) updateData.name = name;
+
+    if (logoFile) {
+      const uploadResult = (await uploadToCloudinary(
+        logoFile.buffer,
+        "workspaces/logos",
+      )) as CloudImage;
+
+      updateData.logo = {
+        image_url: uploadResult.secure_url,
+        public_id: uploadResult.public_id,
+      };
+
+      // delete old logo after new one uploaded
+      const oldPublicId = workspace.logo?.public_id;
+      if (oldPublicId) {
+        await deleteImage(oldPublicId).catch((err) => {
+          console.error("Old logo cleanup failed:", err);
+        });
+      }
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      throw new AppError(400, "No update data provided.");
+    }
+
+    const updatedWorkspace = await WorkspaceModel.findByIdAndUpdate(
+      workspaceId,
+      { $set: updateData },
+      { new: true },
+    );
+
+    if (!updatedWorkspace) throw new AppError(404, "Workspace not found.");
+    return updatedWorkspace;
+  }
+
+  // US-008 — Delete Workspace
+  static async deleteWorkspace(workspaceId: string) {
+    const workspace = await WorkspaceModel.findById(workspaceId);
+    if (!workspace) throw new AppError(404, "Workspace not found.");
+
+    // get project IDs before deleting — needed for cascade deletes
+    const projects = await Project.find({ workspaceId }, "_id");
+    const projectIds = projects.map((p) => p._id);
+
+    // get task IDs before deleting — needed for comment/notification cleanup
+    const tasks = await Task.find({ workspaceId }, "_id");
+    const taskIds = tasks.map((t) => t._id);
+
+    await Promise.all([
+      WorkspaceModel.findByIdAndDelete(workspaceId),
+      UserWorkspace.deleteMany({ workspaceId }),
+      Project.deleteMany({ workspaceId }),
+      Task.deleteMany({ workspaceId }),
+      Invitation.deleteMany({ workspaceId }), // ❌ was missing
+      ProjectMember.deleteMany({ projectId: { $in: projectIds } }),
+      Comment.deleteMany({ taskId: { $in: taskIds } }), // ❌ was missing
+      Notification.deleteMany({ workspaceId }), // ❌ was missing
+    ]);
+
+    // clean up logo after DB deletes
+    if (workspace.logo?.public_id) {
+      await deleteImage(workspace.logo.public_id).catch((err) => {
+        console.error("Workspace logo cleanup failed:", err);
+      });
+    }
+
+    return { message: "Workspace deleted successfully." };
+  }
+
+  // view members
   static async getWorkspaceMembers(workspaceId: string) {
     const members = await UserWorkspace.find({ workspaceId }).populate(
       "userId",
-      "name email",
+      "name email avatar",
     );
     return members;
   }
 
-  // update roles of admin and member
+  // update member role
   static async updateMemberRole(
     workspaceId: string,
     memberId: string,
@@ -182,13 +189,9 @@ export class Workspace {
 
     const targetMember = await UserWorkspace.findOne({
       userId: memberId,
-      workspaceId: workspaceId,
+      workspaceId,
     });
     if (!targetMember) throw new AppError(404, "Member not found.");
-
-    if (targetMember.workspaceId.toString() !== workspaceId) {
-      throw new AppError(400, "Member does not belong to this workspace.");
-    }
 
     if (targetMember.userId.toString() === currentUserId) {
       throw new AppError(403, "Cannot change your own role.");
@@ -200,9 +203,11 @@ export class Workspace {
 
     targetMember.role = newRole;
     await targetMember.save();
+
+    return targetMember;
   }
 
-  // delete roles of admin and member
+  // delete member
   static async deleteMember(
     workspaceId: string,
     memberId: string,
@@ -212,23 +217,26 @@ export class Workspace {
       userId: currentUserId,
       workspaceId,
     });
-    if (!currentUserMembership)
+    if (!currentUserMembership) {
       throw new AppError(403, "You are not a member of this workspace.");
+    }
+
     const targetUserMembership = await UserWorkspace.findOne({
       userId: memberId,
       workspaceId,
     });
     if (!targetUserMembership) throw new AppError(404, "Member not found.");
+
     if (currentUserMembership.role === "admin") {
       if (targetUserMembership.role === "owner") {
         throw new AppError(403, "Admin cannot remove Owners.");
-      } else if (targetUserMembership.role === "admin") {
-        throw new AppError(
-          403,
-          "Admin cannot remove other Admins. Only Owners can.",
-        );
+      }
+      if (targetUserMembership.role === "admin") {
+        throw new AppError(403, "Admin cannot remove other Admins.");
       }
     }
-    await UserWorkspace.findByIdAndDelete(memberId);
+
+    await UserWorkspace.findByIdAndDelete(targetUserMembership._id);
+    return { message: "Member removed successfully." };
   }
 }

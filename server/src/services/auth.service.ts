@@ -23,6 +23,11 @@ export interface RegisterDto extends LoginDto {
   password: string;
 }
 
+export interface CloudImage {
+  secure_url: string;
+  public_id: string;
+}
+
 export class AuthService {
   // register
   static async register(
@@ -75,24 +80,15 @@ export class AuthService {
     try {
       const workspace = await Workspace.create(
         [{ name: workspaceName, ...(logo && { logo }) }],
-        {
-          session,
-        },
+        { session },
       );
       const newWorkspace = workspace?.[0];
       if (!newWorkspace) throw new AppError(500, "Workspace creation failed.");
+
       const user = await User.create(
-        [
-          {
-            name,
-            email,
-            password,
-            ...(avatar && { avatar }),
-          },
-        ],
+        [{ name, email, password, ...(avatar && { avatar }) }],
         { session },
       );
-
       const newUser = user?.[0];
       if (!newUser) throw new AppError(500, "User creation failed.");
 
@@ -102,25 +98,26 @@ export class AuthService {
         { session },
       );
 
-      await UserWorkspace.create({
-        userId: newUser._id,
-        workspaceId: newWorkspace._id,
-        role: "owner",
-      });
+      await UserWorkspace.create(
+        [{ userId: newUser._id, workspaceId: newWorkspace._id, role: "owner" }],
+        { session },
+      );
 
       await session.commitTransaction();
 
       const secureUser = await User.findById(newUser._id).select("-password");
       return { user: secureUser, workspace: newWorkspace };
     } catch (error) {
-      const cleanupTasks = [
+      if (session.inTransaction()) {
+        await session.abortTransaction();
+      }
+
+      await Promise.allSettled([
         avatar?.public_id
           ? deleteImage(avatar.public_id)
           : Promise.resolve(null),
         logo?.public_id ? deleteImage(logo.public_id) : Promise.resolve(null),
-      ];
-
-      await Promise.allSettled(cleanupTasks).then((results) => {
+      ]).then((results) => {
         results.forEach((r) => {
           if (r.status === "rejected") {
             console.error("Cloudinary cleanup failed:", r.reason);
@@ -216,52 +213,76 @@ export class AuthService {
     };
   }
 
-  // profile
-  static async getProfile(userId: string) {
-    const user = await User.findById(userId).select("-password");
-    if (!user) {
-      throw new AppError(404, "User not found.");
-    }
+  // profile details
+  static async getProfile(workspaceId: string, userId: string) {
+    const userInfo = await UserWorkspace.findOne({ userId, workspaceId })
+      .populate("userId", "name email avatar")
+      .populate("workspaceId", "name logo");
 
-    const workspaces = await UserWorkspace.find({
-      userId: new mongoose.Types.ObjectId(userId),
-    }).populate("workspaceId");
+    if (!userInfo) throw new AppError(404, "Profile not found.");
 
     return {
-      user,
-      workspaces,
+      name: (userInfo.userId as any).name,
+      email: (userInfo.userId as any).email,
+      avatar: (userInfo.userId as any).avatar,
+      role: userInfo.role,
+      workspace: {
+        name: (userInfo.workspaceId as any).name,
+        logo: (userInfo.workspaceId as any).logo,
+      },
     };
   }
 
-  // update name
-  static async updateName(userId: string, name: string) {
+  // update profile
+  static async updateProfile(userId: string, name?: string) {
+    if (!name) throw new AppError(400, "No update data provided.");
+
     const user = await User.findByIdAndUpdate(
       userId,
-      { name },
+      { $set: { name } },
       { new: true },
     ).select("-password -refreshToken");
+
+    if (!user) throw new AppError(404, "User not found.");
     return user;
   }
 
-  // update or upload user's avatar
-  // static async uploadAvatar(userId: string, image_url: string) {
-  //   const user = await User.findById(userId).select("-password -refresh_token");
-  //   if (!user) {
-  //     throw new AppError(404, "User not found.");
-  //   }
-  //   if (user.avatar?.image_url) {
-  //     await deleteImage(user.avatar.public_id);
-  //   }
-  //   const response = await uploadToCloudinary(image_url, "jira-clone/avatar");
-  //   const completedUser = await User.findByIdAndUpdate(user._id, {
-  //     avatar: {
-  //       image_url: response.image_url,
-  //       public_alt: response.public_alt,
-  //     },
-  //   });
-  //   const userToSendClient = await User.findById(completedUser?._id).select(
-  //     "-password -refreshToken",
-  //   );
-  //   return userToSendClient;
-  // }
+  // update avatar
+  static async updateAvatar(
+    userId: string,
+    avatarToUpdate: Express.Multer.File,
+  ) {
+    if (!avatarToUpdate) throw new AppError(400, "Avatar file is required.");
+
+    const user = await User.findById(userId).select("-password -refreshToken");
+    if (!user) throw new AppError(404, "User not found.");
+
+    const uploadedAvatar = (await uploadToCloudinary(
+      avatarToUpdate.buffer,
+      "users/avatars",
+    )) as CloudImage;
+
+    console.log("Uploaded new avatar:", uploadedAvatar.public_id);
+
+    const newAvatar: Image = {
+      image_url: uploadedAvatar.secure_url,
+      public_id: uploadedAvatar.public_id,
+    };
+
+    const oldPublicId = user.avatar?.public_id;
+    if (oldPublicId) {
+      await deleteImage(oldPublicId).catch((err) => {
+        console.error("Old avatar cleanup failed:", oldPublicId, err);
+      });
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { avatar: newAvatar },
+      { new: true },
+    ).select("-password -refreshToken");
+
+    if (!updatedUser) throw new AppError(500, "Failed to update avatar.");
+    return updatedUser;
+  }
 }

@@ -5,7 +5,8 @@ import {
   login,
   logout,
   register,
-  updateName,
+  updateProfile,
+  uploadAvatar,
 } from "../controllers/auth.controller.js";
 import {
   loginValidation,
@@ -17,6 +18,7 @@ import { protect } from "../middlewares/protect.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
 
 const router = Router();
+
 router.post(
   "/register",
   upload.fields([
@@ -28,7 +30,12 @@ router.post(
 router.post("/login", loginValidation, validate, login);
 router.delete("/logout", protect, logout);
 router.post("/refresh", refreshTokenValidation, validate, generateTokens);
-router.get("/profile", protect, getProfile);
-router.patch("/profile/update-name", protect, updateName);
-// router.patch("/profile/upload-avatar", protect, uploadAvatar);
+router.get("/:workspaceId/profile", protect, getProfile);
+router.patch("/profile/update-profile", protect, updateProfile);
+router.patch(
+  "/profile/update-avatar",
+  protect,
+  upload.single("avatar"),
+  uploadAvatar,
+);
 export default router;

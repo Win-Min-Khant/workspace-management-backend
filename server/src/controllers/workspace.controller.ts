@@ -9,12 +9,13 @@ import { UserWorkspace } from "../models/user_workspace.model.js";
 // @access Private (Owner)
 export const createWorkspace = asyncHandler(
   async (req: AuthRequest, res: Response) => {
-    const { name, logoPath } = req.body;
+    const { name } = req.body;
+    const logoFile = req.file;
     const ownerId = req.user?.userId;
     const result = await Workspace.createWorkspace(
       name,
-      logoPath,
       ownerId as string,
+      logoFile,
     );
     res.status(200).json({
       success: true,
@@ -28,12 +29,9 @@ export const createWorkspace = asyncHandler(
 // @access Private (Owner/Admin)
 export const getWorkspaceDetails = asyncHandler(
   async (req: AuthRequest, res: Response) => {
-    const workspaceId = req.params.id;
+    const { workspaceId } = req.params;
     const result = await Workspace.getWorkspaceDetails(workspaceId as string);
-    res.status(200).json({
-      success: true,
-      data: result,
-    });
+    res.status(200).json({ success: true, data: result });
   },
 );
 
@@ -42,12 +40,13 @@ export const getWorkspaceDetails = asyncHandler(
 // @access Private (Owner)
 export const updateWorkspace = asyncHandler(
   async (req: AuthRequest, res: Response) => {
-    const { name, logo } = req.body;
-    const workspaceId = req.params.id;
+    const { name } = req.body;
+    const { workspaceId } = req.params;
+    const logoFile = req.file;
     const result = await Workspace.updateWorkspace(
       workspaceId as string,
       name,
-      logo,
+      logoFile,
     );
     res.status(200).json({
       success: true,
@@ -62,29 +61,13 @@ export const updateWorkspace = asyncHandler(
 // @access Private (Owner)
 export const deleteWorkspace = asyncHandler(
   async (req: AuthRequest, res: Response) => {
-    const workspaceId = req.params.id;
-    const userId = req.user?.userId;
-    await Workspace.deleteWorkspace(workspaceId as string, userId as string);
+    const { workspaceId } = req.params;
+    await Workspace.deleteWorkspace(workspaceId as string);
     res
       .status(200)
       .json({ success: true, message: "Workspace deleted successfully." });
   },
 );
-
-// @route POST | api/workspace/switch
-// @desc POST Workspace
-// @access Private (Owner)
-// export const switchWorkspace = asyncHandler(
-//   async (req: AuthRequest, res: Response) => {
-//     const workspaceId = req.params.id;
-//     const userId = req.user?.userId;
-//     const result = await Workspace.switchWorkspace(
-//       userId as string,
-//       workspaceId as string,
-//     );
-//     res.status(200).json({ success: true, accessToken: result.accessToken });
-//   },
-// );
 
 // @route GET | api/workspace/:id/members
 // @desc GET Owner/Admin/Member can view members in their workspace.

@@ -28,13 +28,25 @@ export class Activity {
   // show activity
   static async getLogs(workspaceId: string, page: number, limit: number) {
     const skip = (page - 1) * limit;
-    const activityLogs = await ActivityLog.find({
-      workspaceId: new mongoose.Types.ObjectId(workspaceId),
-    })
-      .populate("userId", "name avatar")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
-    return activityLogs;
+    const workspaceObjectId = new mongoose.Types.ObjectId(workspaceId);
+
+    const [activityLogs, total] = await Promise.all([
+      ActivityLog.find({ workspaceId: workspaceObjectId })
+        .populate("userId", "name avatar")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      ActivityLog.countDocuments({ workspaceId: workspaceObjectId }),
+    ]);
+
+    return {
+      logs: activityLogs,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 }

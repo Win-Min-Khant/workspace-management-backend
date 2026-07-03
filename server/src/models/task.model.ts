@@ -9,8 +9,8 @@ export interface ITask extends mongoose.Document {
   workspaceId: Types.ObjectId;
   assigneeId?: Types.ObjectId | null;
   assignedBy?: Types.ObjectId | null;
-  assignedAt: Date;
-  dueDate?: Date;
+  assignedAt: Date | null;
+  dueDate?: Date | null;
 }
 
 const taskSchema = new Schema<ITask>(

@@ -1,21 +1,23 @@
 import { Router } from "express";
 import { protect } from "../middlewares/protect.middleware.js";
+import { requireRole } from "../middlewares/protect.middleware.js";
 import {
-  getComments,
   addComment,
+  getComments,
   updateComment,
   deleteComment,
 } from "../controllers/comment.controller.js";
 
 const router = Router({ mergeParams: true });
 
-// Route: /api/workspaces/:workspaceId/tasks/:taskId/comments
-router.route("/").get(protect, getComments).post(protect, addComment);
+router
+  .route("/")
+  .get(protect, requireRole("owner", "admin", "member"), getComments)
+  .post(protect, requireRole("owner", "admin", "member"), addComment);
 
-// Route: /api/workspaces/:workspaceId/tasks/:taskId/comments/:commentId
 router
   .route("/:commentId")
-  .patch(protect, updateComment)
-  .delete(protect, deleteComment);
+  .patch(protect, requireRole("owner", "admin", "member"), updateComment)
+  .delete(protect, requireRole("owner", "admin", "member"), deleteComment);
 
 export default router;

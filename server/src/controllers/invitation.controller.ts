@@ -1,4 +1,4 @@
-import type { Response } from "express";
+import type { Request, Response } from "express";
 import type { AuthRequest } from "../middlewares/protect.middleware.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { InvitationService } from "../services/invitation.service.js";
@@ -14,15 +14,6 @@ export const sendInvitation = asyncHandler(
     const { email, role } = req.body;
     const invitedBy = req.user?.userId;
     const workspaceId = req.params.workspaceId;
-    const membership = await UserWorkspace.findOne({
-      userId: String(invitedBy),
-      workspaceId: String(workspaceId),
-    });
-    if (!membership)
-      throw new AppError(404, "You does not belong to the workspace.");
-    if (membership.role === "admin" && role === "admin") {
-      throw new AppError(403, "You cannot invite other members as admin.");
-    }
     const result = await InvitationService.sendInvitation(
       email,
       workspaceId as string,
@@ -41,34 +32,45 @@ export const sendInvitation = asyncHandler(
 // @access Private (Owner or Admin)
 export const acceptInvitation = asyncHandler(
   async (req: AuthRequest, res: Response) => {
-    const token = req.params.token;
-    let userId: string | undefined;
+    const { token } = req.params;
+    const { name, password } = req.body || {};
+
+    let existingUserId: string | undefined;
     const authHeader = req.headers.authorization;
     const accessToken = authHeader?.startsWith("Bearer ")
       ? authHeader.split(" ")[1]
       : null;
+
     if (accessToken) {
       try {
         const decoded = jwt.verify(
           accessToken,
           process.env.JWT_ACCESS_TOKEN_SECRET_KEY!,
-        ) as any;
-        userId = decoded.userId;
-      } catch (error) {
-        throw new AppError(401, "Invalid Token");
+        ) as { userId: string };
+        existingUserId = decoded.userId;
+      } catch {
+        existingUserId = undefined;
       }
     }
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "You need an account to join this workspace.",
-        action: "Please register to accept this invitation.",
-      });
-    }
-    const result = await InvitationService.acceptInvitation(
-      token as string,
-      userId as string,
-    );
+
+    const result = await InvitationService.acceptInvitation(token as string, {
+      token: token as string,
+      name: name as string,
+      password: password as string,
+      userId: existingUserId as string,
+    });
+
+    res.status(200).json({ success: true, data: result });
+  },
+);
+
+export const verifyInvitation = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { token } = req.params;
+    if (!token) throw new AppError(400, "Token is required.");
+
+    const result = await InvitationService.verifyInvitation(token as string);
+
     res.status(200).json({ success: true, data: result });
   },
 );

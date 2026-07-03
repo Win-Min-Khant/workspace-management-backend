@@ -5,6 +5,8 @@ import { UserWorkspace } from "../models/user_workspace.model.js";
 import { AppError } from "../utils/appError.js";
 import { Project } from "../models/project.model.js";
 import { Activity } from "./activity.service.js";
+import { Comment } from "../models/comment.model.js";
+import { Notification } from "../models/notification.model.js";
 
 interface CreateTaskDTO {
   title: string;
@@ -13,10 +15,10 @@ interface CreateTaskDTO {
   priority: "low" | "medium" | "high";
   workspaceId: string;
   projectId: string;
-  assigneeId?: string;
-  assignedBy?: string;
-  assignedAt: Date;
-  dueDate?: Date;
+  assigneeId?: string | null;
+  assignedBy?: string | null;
+  assignedAt: Date | null;
+  dueDate?: Date | null;
 }
 
 interface UpdateTaskDTO {
@@ -24,36 +26,51 @@ interface UpdateTaskDTO {
   description?: string;
   status?: "todo" | "in-progress" | "done";
   priority?: "low" | "medium" | "high";
-  workspaceId: string;
-  projectId: string;
   assigneeId?: string;
-  assignedBy?: string;
-  assignedAt: Date;
   dueDate?: Date;
 }
 
-interface UpdateStatus {
+interface UpdateStatusDTO {
   status?: "todo" | "in-progress" | "done";
 }
 
 export class TaskService {
   // create task
   static async createTask(data: CreateTaskDTO) {
-    const { projectId, assigneeId, workspaceId } = data;
+    const { projectId, assigneeId, workspaceId, assignedBy } = data;
+    const project = await Project.findOne({ _id: projectId, workspaceId });
+    if (!project) throw new AppError(404, "Project not found.");
 
-    const project = await ProjectMember.findOne({
-      userId: new mongoose.Types.ObjectId(assigneeId),
-      projectId,
-    });
-    // console.log(`assigneeId: ${assigneeId}, projectId - ${projectId}`);
-    if (!project) throw new AppError(404, "Project not found");
+    if (assigneeId) {
+      const isProjectMember = await ProjectMember.findOne({
+        projectId,
+        userId: assigneeId,
+      });
+      if (!isProjectMember)
+        throw new AppError(400, "Assignee is not a member of this project.");
+    }
 
     const task = await Task.create({
-      ...data,
-      workspaceId,
-      assignedAt: new Date(),
-      status: "todo",
+      title: data.title,
+      description: data.description || "",
+      status: data.status || "todo",
+      priority: data.priority || "medium",
+      projectId: data.projectId,
+      workspaceId: data.workspaceId,
+      assigneeId: data.assigneeId || null,
+      assignedBy: data.assignedBy || null,
+      assignedAt: data.assignedAt || new Date(),
+      dueDate: data.dueDate || null,
     });
+
+    if (assigneeId) {
+      await Notification.create({
+        userId: assigneeId,
+        workspaceId,
+        taskId: task._id,
+        message: `You have been assigned to task '${task.title}'.`,
+      }).catch((err) => console.error("Notification creation failed:", err));
+    }
 
     await Activity.logActivity(
       workspaceId,
@@ -88,41 +105,75 @@ export class TaskService {
     workspaceId: string,
     userId: string,
     role: string,
+    projectId?: string,
     search?: string,
     status?: string,
     priority?: string,
     assigneeId?: string,
   ) {
-    const query: any = { workspaceId };
+    const query: any = {
+      workspaceId,
+    };
 
     if (role !== "owner" && role !== "admin") {
       query.assigneeId = userId;
     }
 
-    if (search) {
-      query.title = { $regex: search, $options: "i" };
-    }
+    if (projectId) query.projectId = projectId;
 
-    if (status) {
-      query.status = status;
-    }
-
-    if (priority) {
-      query.priority = priority;
-    }
+    if (search) query.title = { $regex: search, $options: "i" };
+    if (status) query.status = status;
+    if (priority) query.priority = priority;
 
     if ((role === "owner" || role === "admin") && assigneeId) {
       query.assigneeId = assigneeId;
     }
 
-    return await Task.find(query).populate("assigneeId", "name");
+    return await Task.find(query)
+      .select("title priority status dueDate assigneeId projectId")
+      .populate("assignedBy", "name")
+      .sort({ createdAt: -1 });
   }
 
   // update task
-  static async updateTask(taskId: string, updateData: UpdateTaskDTO) {
-    const updatedTask = await Task.findByIdAndUpdate(taskId, updateData, {
-      returnDocument: "after",
-    });
+  static async updateTask(
+    taskId: string,
+    workspaceId: string,
+    projectId: string,
+    updateData: UpdateTaskDTO,
+  ) {
+    const formattedData: any = {};
+    if (updateData.title !== undefined) formattedData.title = updateData.title;
+    if (updateData.description !== undefined)
+      formattedData.description = updateData.description;
+    if (updateData.status !== undefined)
+      formattedData.status = updateData.status;
+    if (updateData.priority !== undefined)
+      formattedData.priority = updateData.priority;
+    if (updateData.assigneeId !== undefined)
+      formattedData.assigneeId = updateData.assigneeId;
+    if (updateData.dueDate !== undefined)
+      formattedData.dueDate = new Date(updateData.dueDate);
+    if (Object.keys(formattedData).length === 0) {
+      throw new AppError(400, "No update data provided.");
+    }
+    const updatedTask = await Task.findOneAndUpdate(
+      { _id: taskId, workspaceId, projectId },
+      { $set: formattedData },
+      { returnDocument: "after", runValidators: true },
+    );
+
+    if (!updatedTask) throw new AppError(404, "Task not found.");
+
+    if (updateData.assigneeId && updatedTask) {
+      await Notification.create({
+        userId: updateData.assigneeId,
+        workspaceId,
+        taskId: taskId,
+        message: `You have been assigned to task '${updatedTask.title}'.`,
+      }).catch((err) => console.error("Notification creation failed:", err));
+    }
+
     return updatedTask;
   }
 
@@ -130,33 +181,32 @@ export class TaskService {
   static async updateTaskStatus(
     taskId: string,
     userId: string,
-    status: UpdateStatus,
     workspaceId: string,
+    projectId: string,
+    data: UpdateStatusDTO,
   ) {
-    const updatedTaskStatus = await Task.findOneAndUpdate(
-      {
-        _id: taskId,
-        assigneeId: userId,
-      },
-      {
-        status,
-      },
-      { returnDocument: "after" },
+    const updatedTask = await Task.findOneAndUpdate(
+      { _id: taskId, assigneeId: userId, workspaceId, projectId },
+      { $set: { status: data.status } },
+      { returnDocument: "after", runValidators: true },
     );
-    if (!updatedTaskStatus)
+    if (!updatedTask) {
       throw new AppError(
         404,
-        "Task not found or unauthorized to update status",
+        "Task not found or you are not assigned to this task.",
       );
+    }
+
     await Activity.logActivity(
       workspaceId,
       userId,
       "TASK_STATUS_CHANGED",
       taskId,
       "TASK",
-      `Task status changed to '${status}'.`,
-    );
-    return updatedTaskStatus;
+      `Task status changed to '${data.status}'.`,
+    ).catch((err) => console.error("Activity log failed:", err));
+
+    return updatedTask;
   }
 
   // delete task
@@ -166,12 +216,25 @@ export class TaskService {
     workspaceId: string,
     projectId: string,
   ) {
-    const task = await Task.findOneAndDelete({
-      _id: taskId,
-      workspaceId,
-      projectId,
-    });
-    if (!task) throw new Error("Task not found in this workspace.");
+    const task = await Task.findOne({ _id: taskId, workspaceId, projectId });
+    if (!task) throw new AppError(404, "Task not found.");
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      await Task.deleteOne({ _id: taskId, workspaceId, projectId }).session(
+        session,
+      );
+      await Comment.deleteMany({ taskId }).session(session);
+      await Notification.deleteMany({ taskId }).session(session);
+      await session.commitTransaction();
+    } catch (error) {
+      if (session.inTransaction()) {
+        await session.abortTransaction();
+      }
+      throw error;
+    } finally {
+      session.endSession();
+    }
     await Activity.logActivity(
       workspaceId,
       userId,
@@ -179,7 +242,7 @@ export class TaskService {
       taskId,
       "TASK",
       `Task '${task.title}' was deleted.`,
-    );
+    ).catch((err) => console.error("Activity log failed:", err));
     return task;
   }
 }
