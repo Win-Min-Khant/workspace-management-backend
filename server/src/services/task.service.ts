@@ -130,7 +130,8 @@ export class TaskService {
     }
 
     return await Task.find(query)
-      .select("title priority status dueDate assigneeId projectId")
+      .select("title priority status dueDate assigneeId assignedBy projectId")
+      .populate("assigneeId", "name avatar")
       .populate("assignedBy", "name")
       .sort({ createdAt: -1 });
   }

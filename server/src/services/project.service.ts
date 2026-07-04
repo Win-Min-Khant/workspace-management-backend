@@ -118,6 +118,40 @@ export class ProjectService {
     return projects;
   }
 
+  // view project details
+  static async getProjectDetails(
+    projectId: string,
+    workspaceId: string,
+    userId: string,
+    role: string,
+  ) {
+    const project = await Project.findOne({
+      _id: projectId,
+      workspaceId,
+    }).populate("createdBy", "name email avatar");
+    if (!project) throw new AppError(404, "Project not found.");
+
+    if (role !== "owner" && role !== "admin") {
+      const isMember = await ProjectMember.findOne({ projectId, userId });
+      if (!isMember) {
+        throw new AppError(403, "You are not assigned to this project.");
+      }
+    }
+
+    const [members, tasks] = await Promise.all([
+      ProjectMember.find({ projectId }).populate("userId", "name email avatar"),
+      Task.find({ projectId, workspaceId })
+        .select("title status priority dueDate assigneeId")
+        .populate("assigneeId", "name avatar"),
+    ]);
+
+    return {
+      project,
+      members,
+      tasks,
+    };
+  }
+
   // update project
   static async updateProject(
     projectId: string,

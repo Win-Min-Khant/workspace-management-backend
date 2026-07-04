@@ -12,7 +12,7 @@ export class NotificationService {
   // mark single notification as read
   static async markAsRead(notificationId: string, userId: string) {
     const notification = await Notification.findOneAndUpdate(
-      { _id: notificationId, userId }, // userId ensures user owns this notification
+      { _id: notificationId, userId },
       { isRead: true },
       { new: true },
     );

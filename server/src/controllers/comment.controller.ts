@@ -53,7 +53,7 @@ export const getComments = asyncHandler(
 // @access Private (Author only)
 export const updateComment = asyncHandler(
   async (req: AuthRequest, res: Response) => {
-    const { commentId } = req.params;
+    const { commentId, taskId, workspaceId } = req.params;
     const { content } = req.body;
     const userId = req.user?.userId as string;
 
@@ -63,6 +63,8 @@ export const updateComment = asyncHandler(
       commentId as string,
       userId,
       content,
+      taskId as string,
+      workspaceId as string,
     );
 
     res.status(200).json({ success: true, data: comment });
@@ -74,7 +76,7 @@ export const updateComment = asyncHandler(
 // @access Private (Author/Owner/Admin)
 export const deleteComment = asyncHandler(
   async (req: AuthRequest, res: Response) => {
-    const { commentId, workspaceId } = req.params;
+    const { commentId, workspaceId, taskId } = req.params;
     const userId = req.user?.userId as string;
 
     if (!userId) throw new AppError(401, "Unauthorized.");
@@ -83,6 +85,7 @@ export const deleteComment = asyncHandler(
       commentId as string,
       userId,
       workspaceId as string,
+      taskId as string,
     );
 
     res.status(200).json({ success: true, data: result });

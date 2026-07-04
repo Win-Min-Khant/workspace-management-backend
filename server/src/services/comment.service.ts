@@ -4,6 +4,7 @@ import { UserWorkspace } from "../models/user_workspace.model.js";
 import { AppError } from "../utils/appError.js";
 
 export class CommentService {
+  // add comment
   static async addComment(
     content: string,
     authorId: string,
@@ -41,35 +42,6 @@ export class CommentService {
     return comment;
   }
 
-  // delete comment — author or owner/admin can delete
-  static async deleteComment(
-    commentId: string,
-    userId: string,
-    workspaceId: string,
-  ) {
-    const comment = await Comment.findById(commentId);
-    if (!comment) throw new AppError(404, "Comment not found.");
-
-    const isAuthor = comment.authorId.toString() === userId;
-
-    if (!isAuthor) {
-      // check if user has elevated role before rejecting
-      const membership = await UserWorkspace.findOne({ userId, workspaceId });
-      const isPrivileged =
-        membership?.role === "owner" || membership?.role === "admin";
-
-      if (!isPrivileged) {
-        throw new AppError(
-          403,
-          "You do not have permission to delete this comment.",
-        );
-      }
-    }
-
-    await Comment.findByIdAndDelete(commentId);
-    return { message: "Comment deleted successfully." };
-  }
-
   // get comments
   static async getComments(
     taskId: string,
@@ -95,21 +67,28 @@ export class CommentService {
       );
     }
 
-    const comments = await Comment.find({ taskId })
+    const comments = await Comment.find({ taskId, workspaceId })
       .populate("authorId", "name avatar")
       .sort({ createdAt: 1 });
 
     return comments;
   }
 
+  // update comment — only author can edit
   static async updateComment(
     commentId: string,
     userId: string,
     content: string,
+    taskId: string,
+    workspaceId: string,
   ) {
     if (!content) throw new AppError(400, "Comment content is required.");
 
-    const comment = await Comment.findById(commentId);
+    const comment = await Comment.findOne({
+      _id: commentId,
+      taskId,
+      workspaceId,
+    });
     if (!comment) throw new AppError(404, "Comment not found.");
 
     if (comment.authorId.toString() !== userId) {
@@ -120,5 +99,38 @@ export class CommentService {
     await comment.save();
 
     return comment;
+  }
+
+  // delete comment — author or owner/admin can delete
+  static async deleteComment(
+    commentId: string,
+    userId: string,
+    workspaceId: string,
+    taskId: string,
+  ) {
+    const comment = await Comment.findOne({
+      _id: commentId,
+      taskId,
+      workspaceId,
+    });
+    if (!comment) throw new AppError(404, "Comment not found.");
+
+    const isAuthor = comment.authorId.toString() === userId;
+
+    if (!isAuthor) {
+      const membership = await UserWorkspace.findOne({ userId, workspaceId });
+      const isPrivileged =
+        membership?.role === "owner" || membership?.role === "admin";
+
+      if (!isPrivileged) {
+        throw new AppError(
+          403,
+          "You do not have permission to delete this comment.",
+        );
+      }
+    }
+
+    await Comment.findByIdAndDelete(commentId);
+    return { message: "Comment deleted successfully." };
   }
 }

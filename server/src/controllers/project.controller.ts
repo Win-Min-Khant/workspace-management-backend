@@ -33,9 +33,6 @@ export const createProject = asyncHandler(
   },
 );
 
-// @route POST | api/workspace/:workspaceId/projects/create
-// @desc POST Create a new project
-// @access Private (Owner/Admin)
 // export const getProjects = asyncHandler(
 //   async (req: AuthRequest, res: Response) => {
 //     const { workspaceId } = req.params;
@@ -150,5 +147,33 @@ export const getProjects = asyncHandler(
     });
 
     res.status(200).json({ success: true, data: projects });
+  },
+);
+
+// @route GET | api/workspaces/:workspaceId/projects/:projectId
+// @desc GET View project details
+// @access Private (Owner/Admin/Member)
+export const getProjectDetails = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    const { workspaceId, projectId } = req.params;
+    const userId = req.user?.userId as string;
+
+    if (!userId) throw new AppError(401, "Unauthorized.");
+
+    const membership = await UserWorkspace.findOne({
+      userId,
+      workspaceId: String(workspaceId),
+    });
+    if (!membership)
+      throw new AppError(403, "You are not a member of this workspace.");
+
+    const result = await ProjectService.getProjectDetails(
+      projectId as string,
+      workspaceId as string,
+      userId,
+      membership.role,
+    );
+
+    res.status(200).json({ success: true, data: result });
   },
 );
