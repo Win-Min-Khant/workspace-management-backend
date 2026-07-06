@@ -385,7 +385,7 @@ NODE_ENV=development
 PORT=8000
 
 # Database
-MONGO_LOCAL_URI=mongodb://localhost:27017/jira?replicaSet=rs0
+MONGO_LOCAL_URI=
 MONGO_URI=mongodb+srv://...
 
 # JWT
