@@ -92,11 +92,11 @@ export class AuthService {
       const newUser = user?.[0];
       if (!newUser) throw new AppError(500, "User creation failed.");
 
-      await Workspace.findByIdAndUpdate(
-        newWorkspace._id,
-        { ownerId: newUser._id },
-        { session },
-      );
+      // await Workspace.findByIdAndUpdate(
+      //   newWorkspace._id,
+      //   { ownerId: newUser._id },
+      //   { session },
+      // );
 
       await UserWorkspace.create(
         [{ userId: newUser._id, workspaceId: newWorkspace._id, role: "owner" }],

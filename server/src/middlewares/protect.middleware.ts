@@ -30,7 +30,6 @@ export const protect = asyncHandler(
       throw new AppError(401, "Not Authorized.");
     }
 
-    // only wrap jwt.verify in try/catch — let real errors surface naturally
     let decoded: JwtPayload & { userId?: string };
     try {
       decoded = jwt.verify(
@@ -45,7 +44,6 @@ export const protect = asyncHandler(
       throw new AppError(401, "Not Authorized. Invalid Token.");
     }
 
-    // DB calls outside try/catch — real errors surface as themselves
     const user = await User.findById(decoded.userId).select(
       "-password -refreshToken",
     );
