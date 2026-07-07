@@ -133,7 +133,7 @@ User ──────────── UserWorkspace ────────
 
 | Model | Key Fields |
 |---|---|
-| User | name, email, password, avatar, refreshToken, lastAccessedWorkspaceId |
+| User | name, email, password, avatar, refreshToken |
 | Workspace | name, logo, ownerId |
 | UserWorkspace | userId, workspaceId, role (owner/admin/member), status |
 | Project | name, description, status, startDate, endDate, workspaceId, createdBy |
