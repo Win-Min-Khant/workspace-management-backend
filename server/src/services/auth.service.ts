@@ -19,8 +19,6 @@ export interface LoginDto {
 export interface RegisterDto extends LoginDto {
   workspaceName: string;
   name: string;
-  email: string;
-  password: string;
 }
 
 export interface CloudImage {
@@ -37,6 +35,7 @@ export class AuthService {
   ) {
     const { name, email, password, workspaceName } = data;
 
+    // check if email already exists
     const existingUser = await User.findOne({ email });
 
     if (existingUser) {
@@ -135,24 +134,27 @@ export class AuthService {
   static async login(data: LoginDto) {
     const { email, password } = data;
 
+    // check if user exists
     const user = await User.findOne({
       email,
     }).select("+password");
 
     if (!user) {
-      throw new AppError(401, "Invalid credentials.");
+      throw new AppError(401, "Invalid email.");
     }
 
+    // check if password matches
     const isMatch = await user.isPasswordMatch(password);
 
     if (!isMatch) {
-      throw new AppError(401, "Invalid credentials.");
+      throw new AppError(401, "Invalid password.");
     }
 
+    // generate tokens
     const accessToken = user.generateAccessToken();
-
     const refreshToken = user.generateRefreshToken();
 
+    // save refresh token to user document
     user.refreshToken = refreshToken;
 
     await user.save({
@@ -172,10 +174,12 @@ export class AuthService {
 
   // generate both access and refresh token
   static async regenerateTokens(refreshToken: string) {
+    // check if refresh token is provided
     if (!refreshToken) {
       throw new AppError(401, "Refresh token required.");
     }
 
+    // verify refresh token
     const decoded = jwt.verify(
       refreshToken,
       process.env.JWT_REFRESH_TOKEN_SECRET_KEY!,
@@ -183,17 +187,14 @@ export class AuthService {
       userId: string;
     };
 
+    // check if user exists and refresh token matches
     const user = await User.findById(decoded.userId);
-
     if (!user || user.refreshToken !== refreshToken) {
       throw new AppError(401, "Invalid session.");
     }
 
+    // generate new access token
     const newAccessToken = user.generateAccessToken();
-
-    await user.save({
-      validateBeforeSave: false,
-    });
 
     return {
       accessToken: newAccessToken,
@@ -240,7 +241,7 @@ export class AuthService {
     const user = await User.findByIdAndUpdate(
       userId,
       { $set: { name } },
-      { new: true },
+      { returnDocument: "after" },
     ).select("-password -refreshToken");
 
     if (!user) throw new AppError(404, "User not found.");
@@ -262,7 +263,7 @@ export class AuthService {
       "users/avatars",
     )) as CloudImage;
 
-    console.log("Uploaded new avatar:", uploadedAvatar.public_id);
+    // console.log("Uploaded new avatar:", uploadedAvatar.public_id);
 
     const newAvatar: Image = {
       image_url: uploadedAvatar.secure_url,
@@ -279,7 +280,7 @@ export class AuthService {
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { avatar: newAvatar },
-      { new: true },
+      { returnDocument: "after" },
     ).select("-password -refreshToken");
 
     if (!updatedUser) throw new AppError(500, "Failed to update avatar.");

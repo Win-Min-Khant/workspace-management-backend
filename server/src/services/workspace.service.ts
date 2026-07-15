@@ -16,7 +16,20 @@ import { Comment } from "../models/comment.model.js";
 import { Notification } from "../models/notification.model.js";
 
 export class Workspace {
-  // US-006 — View Workspace Details
+  // get all workspaces
+  // list workspaces for the current user
+  static async getMyWorkspaces(userId: string) {
+    const memberships = await UserWorkspace.find({ userId, status: "active" })
+      .populate("workspaceId", "name logo")
+      .select("workspaceId role");
+
+    return memberships.map((m) => ({
+      workspace: m.workspaceId,
+      role: m.role,
+    }));
+  }
+
+  // View Workspace Details
   static async getWorkspaceDetails(workspaceId: string) {
     const [workspace, totalMembers, totalProjects, totalTasks] =
       await Promise.all([
@@ -86,7 +99,7 @@ export class Workspace {
     }
   }
 
-  // US-007 — Update Workspace
+  // Update Workspace
   static async updateWorkspace(
     workspaceId: string,
     name?: string,
@@ -126,23 +139,21 @@ export class Workspace {
     const updatedWorkspace = await WorkspaceModel.findByIdAndUpdate(
       workspaceId,
       { $set: updateData },
-      { new: true },
+      { returnDocument: "after" },
     );
 
     if (!updatedWorkspace) throw new AppError(404, "Workspace not found.");
     return updatedWorkspace;
   }
 
-  // US-008 — Delete Workspace
+  // Delete Workspace
   static async deleteWorkspace(workspaceId: string) {
     const workspace = await WorkspaceModel.findById(workspaceId);
     if (!workspace) throw new AppError(404, "Workspace not found.");
 
-    // get project IDs before deleting — needed for cascade deletes
     const projects = await Project.find({ workspaceId }, "_id");
     const projectIds = projects.map((p) => p._id);
 
-    // get task IDs before deleting — needed for comment/notification cleanup
     const tasks = await Task.find({ workspaceId }, "_id");
     const taskIds = tasks.map((t) => t._id);
 
@@ -151,10 +162,10 @@ export class Workspace {
       UserWorkspace.deleteMany({ workspaceId }),
       Project.deleteMany({ workspaceId }),
       Task.deleteMany({ workspaceId }),
-      Invitation.deleteMany({ workspaceId }), // ❌ was missing
+      Invitation.deleteMany({ workspaceId }),
       ProjectMember.deleteMany({ projectId: { $in: projectIds } }),
-      Comment.deleteMany({ taskId: { $in: taskIds } }), // ❌ was missing
-      Notification.deleteMany({ workspaceId }), // ❌ was missing
+      Comment.deleteMany({ taskId: { $in: taskIds } }),
+      Notification.deleteMany({ workspaceId }),
     ]);
 
     // clean up logo after DB deletes

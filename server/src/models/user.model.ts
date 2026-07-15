@@ -10,7 +10,6 @@ export interface IUser extends Document {
   password: string;
   refreshToken: string;
   avatar?: Image;
-  lastAccessedWorkspaceId?: Types.ObjectId;
   isPasswordMatch(password: string): Promise<boolean>;
   generateAccessToken(activeWorkspaceId?: string): string;
   generateRefreshToken(): string;
@@ -44,10 +43,6 @@ const userSchema = new mongoose.Schema<IUser>(
     },
     refreshToken: {
       type: String,
-    },
-    lastAccessedWorkspaceId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Workspace",
     },
   },
   {

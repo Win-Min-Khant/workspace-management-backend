@@ -2,7 +2,6 @@ import type { Response } from "express";
 import type { AuthRequest } from "../middlewares/protect.middleware.js";
 import { Workspace } from "../services/workspace.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { UserWorkspace } from "../models/user_workspace.model.js";
 
 // @route POST | api/workspace/post
 // @desc Create Workspace
@@ -21,6 +20,17 @@ export const createWorkspace = asyncHandler(
       success: true,
       data: result,
     });
+  },
+);
+
+// @route GET | api/workspace/me
+// @desc List all workspaces the current user belongs to
+// @access Private
+export const getMyWorkspaces = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    const userId = req.user?.userId;
+    const result = await Workspace.getMyWorkspaces(userId as string);
+    res.status(200).json({ success: true, data: result });
   },
 );
 

@@ -4,6 +4,7 @@ import {
   createWorkspace,
   deleteMember,
   deleteWorkspace,
+  getMyWorkspaces,
   getWorkspaceDetails,
   getWorkspaceMembers,
   updateMemberRole,
@@ -14,6 +15,8 @@ import { validate } from "../middlewares/validation.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
 
 const router = Router({ mergeParams: true });
+
+router.get("/me", protect, getMyWorkspaces);
 
 router.post("/", protect, upload.single("logo"), createWorkspace);
 

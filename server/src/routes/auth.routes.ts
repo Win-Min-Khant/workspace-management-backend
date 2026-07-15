@@ -15,7 +15,7 @@ import {
   updateProfileValidation,
 } from "../validations/auth.validation.js";
 import { validate } from "../middlewares/validation.middleware.js";
-import { protect } from "../middlewares/protect.middleware.js";
+import { protect, requireRole } from "../middlewares/protect.middleware.js";
 import { upload } from "../middlewares/multer.middleware.js";
 
 const router = Router();
@@ -33,7 +33,12 @@ router.post(
 router.post("/login", loginValidation, validate, login);
 router.delete("/logout", protect, logout);
 router.post("/refresh", refreshTokenValidation, validate, generateTokens);
-router.get("/:workspaceId/profile", protect, getProfile);
+router.get(
+  "/:workspaceId/profile",
+  protect,
+  requireRole("owner", "admin", "member"),
+  getProfile,
+);
 router.patch(
   "/profile/update-profile",
   protect,

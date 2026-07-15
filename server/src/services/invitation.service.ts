@@ -193,12 +193,6 @@ export class InvitationService {
         { session },
       );
 
-      await User.findByIdAndUpdate(
-        user._id,
-        { lastAccessedWorkspaceId: invitation.workspaceId },
-        { session },
-      );
-
       await Invitation.findByIdAndUpdate(
         invitation._id,
         { status: "accepted" },

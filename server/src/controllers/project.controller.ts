@@ -14,7 +14,6 @@ export const createProject = asyncHandler(
     const workspaceId = req.params.workspaceId as string;
     const userId = req.user?.userId as string;
     if (!userId) throw new AppError(401, "Unauthorized.");
-    if (!name) throw new AppError(400, "Project name is required.");
     const result = await ProjectService.createProject({
       name,
       description,

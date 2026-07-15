@@ -56,7 +56,7 @@ export class ProjectService {
         { session },
       );
 
-      const project = projects[0] as IProject;
+      const project = projects[0];
       if (!project) throw new AppError(500, "Project creation failed.");
 
       await ProjectMember.create(
@@ -159,13 +159,7 @@ export class ProjectService {
     userId: string,
     updateData: UpdateProjectDTO,
   ) {
-    const formattedData: Partial<{
-      name: string;
-      description: string;
-      status: string;
-      startDate: Date;
-      endDate: Date;
-    }> = {};
+    const formattedData: UpdateProjectDTO = {};
 
     if (updateData.name !== undefined) formattedData.name = updateData.name;
     if (updateData.description !== undefined)
@@ -212,34 +206,53 @@ export class ProjectService {
     workspaceId: string,
     userId: string,
   ) {
-    const project = await Project.findOne({ _id: projectId, workspaceId });
-    if (!project)
-      throw new AppError(
-        404,
-        "Project not found or you don't have permission.",
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const project = await Project.findOne(
+        { _id: projectId, workspaceId },
+        null,
+        { session },
       );
+      if (!project) {
+        throw new AppError(
+          404,
+          "Project not found or you don't have permission.",
+        );
+      }
 
-    const taskIds = await Task.distinct("_id", { projectId });
+      const taskIds = await Task.distinct("_id", { projectId }, { session });
 
-    await Project.findByIdAndDelete(projectId);
-    await ProjectMember.deleteMany({ projectId });
-    await Task.deleteMany({ projectId });
-    await Notification.deleteMany({ taskId: { $in: taskIds } });
+      await Project.findByIdAndDelete(projectId, { session });
+      await ProjectMember.deleteMany({ projectId }, { session });
+      await Task.deleteMany({ projectId }, { session });
+      await Notification.deleteMany({ taskId: { $in: taskIds } }, { session });
 
-    if (taskIds.length > 0) {
-      await Comment.deleteMany({ taskId: { $in: taskIds } });
+      if (taskIds.length > 0) {
+        await Comment.deleteMany({ taskId: { $in: taskIds } }, { session });
+      }
+
+      await session.commitTransaction();
+
+      await Activity.logActivity(
+        workspaceId,
+        userId,
+        "PROJECT_DELETED",
+        projectId,
+        "PROJECT",
+        `Project ${project.name} was deleted.`,
+      ).catch((err) => console.error("Activity log failed:", err));
+
+      return { message: "Project deleted successfully." };
+    } catch (err) {
+      if (session.inTransaction()) {
+        await session.abortTransaction();
+      }
+      throw err;
+    } finally {
+      await session.endSession();
     }
-
-    await Activity.logActivity(
-      workspaceId,
-      userId,
-      "PROJECT_DELETED",
-      projectId,
-      "PROJECT",
-      `Project ${project.name} was deleted.`,
-    ).catch((err) => console.error("Activity log failed:", err));
-
-    return { message: "Project deleted successfully." };
   }
 
   // static async deleteProject(

@@ -102,7 +102,6 @@ export const uploadAvatar = asyncHandler(
   async (req: AuthRequest, res: Response) => {
     const userId = req.user?.userId as string;
 
-    if (!userId) throw new AppError(401, "Unauthorized.");
     if (!req.file) throw new AppError(400, "Avatar file is required.");
 
     const result = await AuthService.updateAvatar(userId, req.file);
