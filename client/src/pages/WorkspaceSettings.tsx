@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -20,14 +21,86 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Loader2, ShieldAlert } from "lucide-react";
+import { useUpdateWorkspace } from "@/features/workspace/hooks/useUpdateWorkspace";
+import { useDeleteWorkspace } from "@/features/workspace/hooks/useDeleteWorkspace";
+import { useMyWorkspaces } from "@/features/workspace/hooks/useMyWorkspaces";
+import { getErrorMessage } from "@/utils/getErrorMessage";
+import { useWorkspaceDetails } from "@/features/workspace/hooks/useWorkspaceDetail";
 
 function WorkspaceSettings() {
+  const { workspaceId } = useParams<{ workspaceId: string }>();
+  const { data, isLoading, error } = useWorkspaceDetails(workspaceId as string);
+
+  // figure out my own role in this workspace, same pattern as Members.tsx
+  const { data: workspaces } = useMyWorkspaces();
+  const myRole = workspaces?.find((w) => w.workspace._id === workspaceId)?.role;
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-16">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <p className="text-sm text-destructive">
+        {getErrorMessage(error, "Something went wrong loading this workspace.")}
+      </p>
+    );
+  }
+
+  // block the whole page for anyone who isn't the owner
+  if (myRole !== "owner") {
+    return (
+      <div className="flex flex-col items-center gap-2 py-16 text-center">
+        <ShieldAlert className="h-8 w-8 text-muted-foreground" />
+        <p className="text-sm font-medium">Owner access required</p>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          Only the workspace owner can view or change workspace settings.
+        </p>
+      </div>
+    );
+  }
+
+  return <WorkspaceSettingsForm workspace={data.workspace} />;
+}
+
+function WorkspaceSettingsForm({
+  workspace,
+}: {
+  workspace: { _id: string; name: string; logo?: { image_url: string } };
+}) {
+  const { workspaceId } = useParams<{ workspaceId: string }>();
+
+  const [name, setName] = useState(workspace.name);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+
+  const { mutate: saveChanges, isPending: isSaving } = useUpdateWorkspace(
+    workspaceId as string,
+  );
+  const { mutate: deleteWs, isPending: isDeleting } = useDeleteWorkspace();
 
   function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) setLogoPreview(URL.createObjectURL(file));
+    if (file) {
+      setLogoFile(file);
+      setLogoPreview(URL.createObjectURL(file));
+    }
   }
+
+  function handleSave() {
+    saveChanges({
+      workspaceId: workspaceId as string,
+      name,
+      logo: logoFile ?? undefined,
+    });
+  }
+
+  const isUnchanged = name === workspace.name && !logoFile;
 
   return (
     <div className="flex flex-col gap-6 max-w-2xl">
@@ -47,10 +120,12 @@ function WorkspaceSettings() {
           <div className="flex items-center gap-4">
             <Avatar className="h-16 w-16 rounded-lg">
               <AvatarImage
-                src={logoPreview ?? undefined}
+                src={logoPreview ?? workspace.logo?.image_url}
                 className="rounded-lg"
               />
-              <AvatarFallback className="rounded-lg">CA</AvatarFallback>
+              <AvatarFallback className="rounded-lg">
+                {workspace.name.slice(0, 2).toUpperCase()}
+              </AvatarFallback>
             </Avatar>
             <div>
               <FieldLabel htmlFor="ws-logo" className="cursor-pointer">
@@ -70,11 +145,17 @@ function WorkspaceSettings() {
 
           <Field>
             <FieldLabel htmlFor="ws-name">Workspace name</FieldLabel>
-            <Input id="ws-name" defaultValue="Cannopy" />
+            <Input
+              id="ws-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
           </Field>
         </CardContent>
         <CardFooter>
-          <Button>Save changes</Button>
+          <Button onClick={handleSave} disabled={isSaving || isUnchanged}>
+            {isSaving ? "Saving..." : "Save changes"}
+          </Button>
         </CardFooter>
       </Card>
 
@@ -89,7 +170,9 @@ function WorkspaceSettings() {
         <CardFooter>
           <Dialog>
             <DialogTrigger
-              render={<Button variant="destructive" className="w-auto" />}
+              render={
+                <button className="inline-flex items-center text-white rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90" />
+              }
             >
               Delete workspace
             </DialogTrigger>
@@ -103,8 +186,13 @@ function WorkspaceSettings() {
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
-                <Button variant="destructive" className="w-auto">
-                  Yes, delete workspace
+                <Button
+                  variant="destructive"
+                  className="w-auto"
+                  disabled={isDeleting}
+                  onClick={() => deleteWs(workspaceId as string)}
+                >
+                  {isDeleting ? "Deleting..." : "Yes, delete workspace"}
                 </Button>
               </DialogFooter>
             </DialogContent>

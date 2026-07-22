@@ -11,13 +11,26 @@ import {
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useCreateWorkspace } from "@/features/workspace/hooks/useCreateWorkspace";
 
 function Onboarding() {
+  const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [name, setName] = useState("");
+
+  const { mutate: createWorkspace, isPending } = useCreateWorkspace();
 
   function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) setLogoPreview(URL.createObjectURL(file));
+    if (file) {
+      setLogoFile(file);
+      setLogoPreview(URL.createObjectURL(file));
+    }
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    createWorkspace({ name, logo: logoFile ?? undefined });
   }
 
   return (
@@ -30,7 +43,7 @@ function Onboarding() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form id="onboarding-form">
+          <form id="onboarding-form" onSubmit={handleSubmit}>
             <div className="flex flex-col gap-6">
               <div className="flex items-center gap-4">
                 <Avatar className="h-14 w-14 rounded-lg">
@@ -64,14 +77,22 @@ function Onboarding() {
                   id="onboarding-name"
                   placeholder="Acme team"
                   autoComplete="off"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
                 />
               </Field>
             </div>
           </form>
         </CardContent>
         <CardFooter>
-          <Button type="submit" form="onboarding-form" className="w-full">
-            Create workspace
+          <Button
+            type="submit"
+            form="onboarding-form"
+            className="w-full"
+            disabled={isPending}
+          >
+            {isPending ? "Creating..." : "Create workspace"}
           </Button>
         </CardFooter>
       </Card>

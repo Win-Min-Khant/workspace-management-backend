@@ -54,6 +54,26 @@ interface ProfileResponseData {
   workspace: Workspace;
 }
 
+export interface UpdatedUserAvatar {
+  userId: string;
+  avatar?: File;
+}
+
+export interface UpdateNamePayload {
+  userId: string;
+  name: string;
+}
+
+export interface UpdateUserProfileResponseData {
+  _id: string;
+  name: string;
+  email: string;
+  createdAt: string;
+  updatedAt: string;
+  avatar?: Avatar;
+}
+
+// Login
 export const loginUser = async (
   data: LoginInputs,
 ): Promise<LoginResponseData> => {
@@ -64,6 +84,7 @@ export const loginUser = async (
   return response.data.data;
 };
 
+// Register
 export const registerUser = async (
   data: RegisterInputs,
 ): Promise<RegisterResponseData> => {
@@ -74,6 +95,7 @@ export const registerUser = async (
   return response.data.data;
 };
 
+// Get User Profile
 export const userProfile = async (
   workspaceId: string,
 ): Promise<ProfileResponseData> => {
@@ -83,6 +105,32 @@ export const userProfile = async (
   return response.data.data;
 };
 
+// Logout
 export const logoutUser = async () => {
   await apiClient.delete<ApiResponse<boolean>>("/auth/logout");
+};
+
+// Update Name
+export const updateName = async (
+  data: UpdateNamePayload,
+): Promise<UpdateUserProfileResponseData> => {
+  const response = await apiClient.patch<
+    ApiResponse<UpdateUserProfileResponseData>
+  >("/auth/profile/update-profile", data);
+  return response.data.data;
+};
+
+// Update Avatar
+export const updateAvatar = async (
+  data: UpdatedUserAvatar,
+): Promise<UpdateUserProfileResponseData> => {
+  const formData = new FormData();
+  formData.append("userId", data.userId);
+  if (data.avatar) {
+    formData.append("avatar", data.avatar);
+  }
+  const response = await apiClient.patch<
+    ApiResponse<UpdateUserProfileResponseData>
+  >("/auth/profile/update-avatar", formData);
+  return response.data.data;
 };

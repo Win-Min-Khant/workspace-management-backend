@@ -1,31 +1,20 @@
+import { useParams } from "react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Users,
   FolderKanban,
   CheckSquare,
-  CircleCheck,
   Clock,
   AlertTriangle,
-  Loader2, // Added for loading indicator
+  Loader2,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useWorkspaceDetail } from "@/features/workspace/hooks/useWorkspaceDetail";
-import { useParams } from "react-router";
-
-// fake data — replace with useWorkspaceDetails(workspaceId) later
-const stats = {
-  completedTasks: 24,
-  pendingTasks: 15,
-  overdueTasks: 3,
-};
-
-const recentProjects = [
-  { id: "1", name: "Website redesign", status: "active", taskCount: 7 },
-  { id: "2", name: "Mobile app v2", status: "active", taskCount: 11 },
-  { id: "3", name: "Q3 marketing", status: "planning", taskCount: 4 },
-];
+import { useMyWorkspaces } from "@/features/workspace/hooks/useMyWorkspaces";
+import { useDashboard } from "@/features/dashboard/hooks/useDashboard";
+import { getErrorMessage } from "@/utils/getErrorMessage";
+import { isOwnerDashboard } from "@/features/dashboard/api/dashboardApi";
 
 const statusStyles: Record<string, string> = {
   active: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100",
@@ -35,117 +24,122 @@ const statusStyles: Record<string, string> = {
 
 function Dashboard() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
-  // Added standard isLoading and error statuses from your data hook
-  const { data, isLoading, error } = useWorkspaceDetail(workspaceId as string);
 
-  // 1. Handle Loading State
+  const { data: workspaces } = useMyWorkspaces();
+  const currentEntry = workspaces?.find((w) => w.workspace._id === workspaceId);
+
+  const { data, isLoading, error } = useDashboard(workspaceId as string);
+
   if (isLoading) {
     return (
-      <div className="flex h-[50vh] w-full flex-col items-center justify-center gap-2">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">
-          Loading workspace info...
-        </p>
+      <div className="flex justify-center py-16">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
-  // 2. Handle Error State
   if (error || !data) {
     return (
-      <div className="flex h-[50vh] w-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-6 text-center">
-        <AlertTriangle className="h-10 w-10 text-destructive" />
-        <div>
-          <h3 className="text-lg font-medium">Failed to load workspace</h3>
-          <p className="text-sm text-muted-foreground">
-            {error instanceof Error
-              ? error.message
-              : "There is no data to show right now."}
-          </p>
-        </div>
-      </div>
+      <p className="text-sm text-destructive">
+        {getErrorMessage(error, "Something went wrong loading this workspace.")}
+      </p>
     );
   }
 
-  // 3. Main UI (Guaranteed to have data here)
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-4">
         <Avatar className="h-14 w-14 rounded-lg">
           <AvatarImage
-            src={data.workspace.logo?.image_url}
+            src={currentEntry?.workspace.logo?.image_url}
             className="rounded-lg"
           />
           <AvatarFallback className="rounded-lg">
-            {data.workspace.name.slice(0, 2).toUpperCase()}
+            {currentEntry?.workspace.name.slice(0, 2).toUpperCase() ?? "--"}
           </AvatarFallback>
         </Avatar>
         <div>
-          <h1 className="text-xl font-semibold">{data.workspace.name}</h1>
+          <h1 className="text-xl font-semibold">
+            {currentEntry?.workspace.name ?? "Loading..."}
+          </h1>
           <p className="text-sm text-muted-foreground">Workspace overview</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-        <StatCard
-          label="Members"
-          value={data.totalMembers}
-          icon={<Users className="h-4 w-4" />}
-        />
-        <StatCard
-          label="Projects"
-          value={data.totalProjects}
-          icon={<FolderKanban className="h-4 w-4" />}
-        />
-        <StatCard
-          label="Tasks"
-          value={data.totalTasks}
-          icon={<CheckSquare className="h-4 w-4" />}
-        />
-        <StatCard
-          label="Completed"
-          value={stats.completedTasks}
-          icon={<CircleCheck className="h-4 w-4" />}
-        />
-        <StatCard
-          label="Pending"
-          value={stats.pendingTasks}
-          icon={<Clock className="h-4 w-4" />}
-        />
-        <StatCard
-          label="Overdue"
-          value={stats.overdueTasks}
-          icon={<AlertTriangle className="h-4 w-4" />}
-          variant="danger"
-        />
-      </div>
+      {isOwnerDashboard(data) ? (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          <StatCard
+            label="Members"
+            value={data.totalMembers}
+            icon={<Users className="h-4 w-4" />}
+          />
+          <StatCard
+            label="Projects"
+            value={data.totalProjects}
+            icon={<FolderKanban className="h-4 w-4" />}
+          />
+          <StatCard
+            label="Tasks"
+            value={data.tasks.total}
+            icon={<CheckSquare className="h-4 w-4" />}
+          />
+          <StatCard
+            label="Pending"
+            value={data.tasks.pending}
+            icon={<Clock className="h-4 w-4" />}
+          />
+          <StatCard
+            label="Overdue"
+            value={data.tasks.overdue}
+            icon={<AlertTriangle className="h-4 w-4" />}
+            variant="danger"
+          />
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <StatCard
+              label="Assigned projects"
+              value={data.assignedProjects.count}
+              icon={<FolderKanban className="h-4 w-4" />}
+            />
+            <StatCard
+              label="Tasks"
+              value={data.tasks.total}
+              icon={<CheckSquare className="h-4 w-4" />}
+            />
+            <StatCard
+              label="Pending"
+              value={data.tasks.pending}
+              icon={<Clock className="h-4 w-4" />}
+            />
+          </div>
 
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-medium">Recent projects</h2>
-          <span className="text-sm text-primary cursor-pointer">View all</span>
-        </div>
-        <div className="flex flex-col gap-2">
-          {recentProjects.map((project) => (
-            <Card key={project.id}>
-              <CardContent className="flex items-center justify-between py-3">
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium">{project.name}</span>
-                  <Badge
-                    className={statusStyles[project.status]}
-                    variant="secondary"
-                  >
-                    {project.status}
-                  </Badge>
-                </div>
-                <span className="text-sm text-muted-foreground">
-                  {project.taskCount} tasks
-                </span>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
+          <div>
+            <h2 className="text-sm font-medium mb-3">Your projects</h2>
+            <div className="flex flex-col gap-2">
+              {data.assignedProjects.projects.map((project) => (
+                <Card key={project._id}>
+                  <CardContent className="flex items-center justify-between py-3">
+                    <span className="text-sm font-medium">{project.name}</span>
+                    <Badge
+                      className={statusStyles[project.status]}
+                      variant="secondary"
+                    >
+                      {project.status}
+                    </Badge>
+                  </CardContent>
+                </Card>
+              ))}
+              {data.assignedProjects.projects.length === 0 && (
+                <p className="text-sm text-muted-foreground py-6 text-center">
+                  You haven't been assigned to any projects yet.
+                </p>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

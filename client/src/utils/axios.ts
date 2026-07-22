@@ -26,8 +26,8 @@ async function refreshAccessToken(): Promise<string> {
     { refreshToken },
   );
 
-  // backend only rotates the access token; refresh token stays valid for 7 days
-  const { accessToken } = response.data;
+  // backend wraps responses as { success, data: { accessToken } }
+  const { accessToken } = response.data.data;
   tokenStorage.setAccessToken(accessToken);
   return accessToken;
 }
@@ -39,7 +39,18 @@ apiClient.interceptors.response.use(
       _retry?: boolean;
     };
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // don't try to "refresh" a failed login/register/refresh call itself —
+    // a 401 here means wrong credentials, not an expired token
+    const isAuthEndpoint =
+      originalRequest.url?.includes("/auth/login") ||
+      originalRequest.url?.includes("/auth/register") ||
+      originalRequest.url?.includes("/auth/refresh");
+
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !isAuthEndpoint
+    ) {
       originalRequest._retry = true;
 
       try {

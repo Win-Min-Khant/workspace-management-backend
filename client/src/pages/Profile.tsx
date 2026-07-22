@@ -13,18 +13,15 @@ import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useProfile } from "@/features/auth/hooks/useProfile";
+import { useUpdateName } from "@/features/auth/hooks/useUpdateName";
+import { useUpdateAvatar } from "@/features/auth/hooks/useUpdateAvatar";
 import { Loader2 } from "lucide-react";
 import { getErrorMessage } from "@/utils/getErrorMessage";
+import { tokenStorage } from "@/utils/tokenStorage";
 
 function Profile() {
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const { workspaceId } = useParams();
   const { data: user, isLoading, error } = useProfile(workspaceId as string);
-
-  function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file) setAvatarPreview(URL.createObjectURL(file));
-  }
 
   if (isLoading) {
     return (
@@ -41,6 +38,49 @@ function Profile() {
       </p>
     );
   }
+
+  // by this point, `user` is guaranteed to exist — safe to use directly
+  return <ProfileForm user={user} />;
+}
+
+function ProfileForm({
+  user,
+}: {
+  user: NonNullable<ReturnType<typeof useProfile>["data"]>;
+}) {
+  // const { workspaceId } = useParams();
+  const [name, setName] = useState(user.name);
+
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+
+  const { mutate: saveNameChange, isPending: isSavingName } = useUpdateName();
+  const { mutate: saveAvatarChange, isPending: isSavingAvatar } =
+    useUpdateAvatar();
+
+  function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) {
+      setAvatarFile(file);
+      setAvatarPreview(URL.createObjectURL(file));
+    }
+  }
+
+  function handleSaveName() {
+    const userId = tokenStorage.getUserId();
+    if (!userId) return;
+
+    saveNameChange({ userId, name });
+  }
+
+  function handleSaveAvatar() {
+    const userId = tokenStorage.getUserId();
+    if (!userId || !avatarFile) return;
+
+    saveAvatarChange({ userId, avatar: avatarFile });
+  }
+
+  const isNameUnchanged = name === user.name;
 
   return (
     <div className="flex flex-col gap-6 max-w-5xl mx-auto">
@@ -82,7 +122,12 @@ function Profile() {
             </div>
           </CardContent>
           <CardFooter>
-            <Button type="submit">Save changes</Button>
+            <Button
+              onClick={handleSaveAvatar}
+              disabled={isSavingAvatar || !avatarFile}
+            >
+              {isSavingAvatar ? "Saving..." : "Save changes"}
+            </Button>
           </CardFooter>
         </Card>
 
@@ -94,43 +139,46 @@ function Profile() {
           <CardContent>
             <Field>
               <FieldLabel htmlFor="fullName">Full name</FieldLabel>
-              <Input id="fullName" key={user.name} defaultValue={user.name} />
-            </Field>
-          </CardContent>
-          <CardFooter>
-            <Button type="submit">Save changes</Button>
-          </CardFooter>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Email</CardTitle>
-            <CardDescription>Update your account email</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Field>
-              <FieldLabel htmlFor="email">Email</FieldLabel>
               <Input
-                id="email"
-                type="email"
-                key={user.email}
-                defaultValue={user.email}
+                id="fullName"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
               />
             </Field>
           </CardContent>
           <CardFooter>
-            <Button type="submit">Save changes</Button>
+            <Button
+              onClick={handleSaveName}
+              disabled={isSavingName || isNameUnchanged}
+            >
+              {isSavingName ? "Saving..." : "Save changes"}
+            </Button>
           </CardFooter>
         </Card>
 
-        <Card>
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle>Email</CardTitle>
+            <CardDescription>
+              Your email is tied to your account and can't be changed
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Field>
+              {/* <FieldLabel htmlFor="email">Email</FieldLabel> */}
+              <Input id="email" type="email" value={user.email} disabled />
+            </Field>
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle>Password</CardTitle>
             <CardDescription>
               Change your password. You'll be signed out of other devices.
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col gap-4">
+          <CardContent className="flex gap-4">
             <Field>
               <FieldLabel htmlFor="currentPassword">
                 Current password
@@ -147,7 +195,7 @@ function Profile() {
             </Field>
           </CardContent>
           <CardFooter>
-            <Button type="submit">Update password</Button>
+            <Button disabled>Update password</Button>
           </CardFooter>
         </Card>
       </div>

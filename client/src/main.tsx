@@ -8,6 +8,8 @@ import "react-toastify/dist/ReactToastify.css";
 import { queryClient } from "./app/queryClient.ts";
 import PublicLayout from "./components/layouts/PublicLayout.tsx";
 import MainLayout from "./components/layouts/MainLayout.tsx";
+import ProtectedRoute from "./app/ProtectedRoute.tsx";
+import WorkspaceGate from "./app/WorkspaceGate.tsx";
 import Home from "./pages/Home.tsx";
 import Register from "./pages/auth/Register.tsx";
 import Login from "./pages/auth/Login.tsx";
@@ -24,6 +26,9 @@ import WorkspaceSettings from "./pages/WorkspaceSettings.tsx";
 import Notifications from "./pages/Notifications.tsx";
 import ActivityLog from "./pages/ActivityLog.tsx";
 import Profile from "./pages/Profile.tsx";
+import GuestRoute from "./app/GuestRoute.tsx";
+import CreateProject from "./pages/CreateProject.tsx";
+import EditProject from "./pages/EditProject.tsx";
 
 const router = createBrowserRouter([
   {
@@ -31,18 +36,57 @@ const router = createBrowserRouter([
     element: <PublicLayout />,
     children: [
       { index: true, element: <Home /> },
-      { path: "register", element: <Register /> },
-      { path: "login", element: <Login /> },
+      {
+        path: "register",
+        element: (
+          <GuestRoute>
+            <Register />
+          </GuestRoute>
+        ),
+      },
+      {
+        path: "login",
+        element: (
+          <GuestRoute>
+            <Login />
+          </GuestRoute>
+        ),
+      },
     ],
   },
-  { path: "onboarding", element: <Onboarding /> },
-  { path: "select-workspace", element: <SelectWorkspace /> },
-  { path: "invite/:token", element: <AcceptInvitation /> },
+  {
+    path: "redirect",
+    element: (
+      <ProtectedRoute>
+        <WorkspaceGate />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "onboarding",
+    element: (
+      <ProtectedRoute>
+        <Onboarding />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "select-workspace",
+    element: (
+      <ProtectedRoute>
+        <SelectWorkspace />
+      </ProtectedRoute>
+    ),
+  },
+  { path: "accept-invitation/:token", element: <AcceptInvitation /> },
   {
     path: "w/:workspaceId",
-    element: <MainLayout />,
+    element: (
+      <ProtectedRoute>
+        <MainLayout />
+      </ProtectedRoute>
+    ),
     children: [
-      { path: "profile", element: <Profile /> },
       { path: "dashboard", element: <Dashboard /> },
       { path: "members", element: <Members /> },
       { path: "projects", element: <Projects /> },
@@ -52,6 +96,9 @@ const router = createBrowserRouter([
       { path: "settings", element: <WorkspaceSettings /> },
       { path: "notifications", element: <Notifications /> },
       { path: "activity", element: <ActivityLog /> },
+      { path: "profile", element: <Profile /> },
+      { path: "projects/new", element: <CreateProject /> },
+      { path: "projects/:projectId/edit", element: <EditProject /> },
     ],
   },
 ]);

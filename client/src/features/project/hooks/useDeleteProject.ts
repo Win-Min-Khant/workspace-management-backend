@@ -1,26 +1,24 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
-import { logoutUser } from "../api/authApi";
 import { toast } from "react-toastify";
+import { deleteProject } from "../api/projectApi";
 import { getErrorMessage } from "@/utils/getErrorMessage";
-import { tokenStorage } from "@/utils/tokenStorage";
 
-export function useLogout() {
+export function useDeleteProject(workspaceId: string) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: logoutUser,
+    mutationFn: deleteProject,
     onSuccess: () => {
-      tokenStorage.clearTokens();
-      queryClient.clear();
-      toast.success("Logout successful!");
-      navigate("/");
+      queryClient.invalidateQueries({
+        queryKey: ["workspace", workspaceId, "projects"],
+      });
+      toast.success("Project deleted");
+      navigate(`/w/${workspaceId}/projects`);
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
     },
   });
 }
-
-// Logout lok lik yin home page ko youk ma lo nae login page ko pyn twr tae bug ta khu shi tl
