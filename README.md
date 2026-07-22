@@ -15,6 +15,7 @@ A full-featured project management REST API built with Node.js, Express, TypeScr
 | Authentication | JWT (Access + Refresh Token) |
 | File Storage | Cloudinary |
 | File Parsing | Multer (memory storage) |
+| Validation | express-validator |
 | Email | Nodemailer |
 | Password Hashing | bcryptjs |
 
@@ -86,7 +87,11 @@ server/
 │   │
 │   ├── validations/        # Express-validator schemas
 │   │   ├── auth.validation.ts
-│   │   └── workspace.validation.ts
+│   │   ├── workspace.validation.ts
+│   │   ├── project.validation.ts
+│   │   ├── task.validation.ts
+│   │   ├── invitation.validation.ts
+│   │   └── comment.validation.ts
 │   │
 │   ├── types/
 │   │   └── auth.types.ts               # Shared TypeScript interfaces
@@ -128,7 +133,7 @@ User ──────────── UserWorkspace ────────
 
 | Model | Key Fields |
 |---|---|
-| User | name, email, password, avatar, refreshToken, lastAccessedWorkspaceId |
+| User | name, email, password, avatar, refreshToken |
 | Workspace | name, logo, ownerId |
 | UserWorkspace | userId, workspaceId, role (owner/admin/member), status |
 | Project | name, description, status, startDate, endDate, workspaceId, createdBy |
@@ -356,6 +361,27 @@ Save { image_url, public_id } to MongoDB
      (public_id stored for future deletion)
 ```
 
+### Validation Flow
+```
+Client sends request
+     │
+     ▼
+express-validator schema runs
+     ├── checks required fields
+     ├── checks types and formats (email, mongoId, ISO date)
+     ├── checks length constraints
+     └── checks business rules (endDate after startDate)
+     │
+     ▼
+validate middleware
+     ├── errors found → next(new AppError(400, firstError.msg))
+     └── no errors → req.body sanitized, next()
+     │
+     ▼
+errorHandler returns clean JSON:
+{ success: false, message: "Email is required." }
+```
+
 ### Task Assignment Notification Flow
 ```
 Owner/Admin creates or updates task with assigneeId
@@ -385,7 +411,7 @@ NODE_ENV=development
 PORT=8000
 
 # Database
-MONGO_LOCAL_URI=
+MONGO_LOCAL_URI=mongodb://localhost:27017/jira?replicaSet=rs0
 MONGO_URI=mongodb+srv://...
 
 # JWT
@@ -478,6 +504,8 @@ Building this project covered:
 - **Aggregation pipelines** for dashboard statistics using `$facet`
 - **Pagination** for activity logs
 - **Data scoping** — ensuring workspace data never leaks across workspaces
+- **Request validation** using express-validator with custom business rule checks
+- **Centralized validation middleware** — single `validate` middleware funnels all errors through errorHandler
 
 ---
 
