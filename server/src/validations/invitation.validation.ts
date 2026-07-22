@@ -27,6 +27,6 @@ export const acceptInvitationValidation = [
 
   body("password")
     .optional()
-    .isLength({ min: 6 })
-    .withMessage("Password must be at least 6 characters."),
+    .isLength({ min: 5 })
+    .withMessage("Password must be at least 5 characters."),
 ];

@@ -235,7 +235,7 @@ export class AuthService {
   }
 
   // update profile
-  static async updateProfile(userId: string, name?: string) {
+  static async updateProfile(userId: string, name: string) {
     if (!name) throw new AppError(400, "No update data provided.");
 
     const user = await User.findByIdAndUpdate(
